@@ -1,65 +1,195 @@
-import Image from "next/image";
+"use client"
+
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
+import {
+  Box,
+  Container,
+  Typography,
+  Button,
+  Card,
+  CardContent,
+  CircularProgress,
+  IconButton,
+} from "@mui/material"
+import {
+  CalendarMonth,
+  TrendingUp,
+  Notifications,
+  SupervisorAccount,
+  Person,
+  DarkMode,
+  LightMode,
+} from "@mui/icons-material"
+import Link from "next/link"
+import { useThemeMode } from "@/theme/ThemeContext"
 
 export default function Home() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+  const { mode, toggleTheme } = useThemeMode()
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      if (session?.user?.role === "COUNSELOR") {
+        router.push("/counselor")
+      } else {
+        router.push("/individual")
+      }
+    }
+  }, [session, status, router])
+
+  if (status === "loading") {
+    return (
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          bgcolor: "background.default",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    )
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
+      <IconButton
+        onClick={toggleTheme}
+        sx={{ position: "absolute", top: 16, right: 16 }}
+      >
+        {mode === "light" ? <DarkMode /> : <LightMode />}
+      </IconButton>
+
+      <Container maxWidth="lg">
+        <Box
+          sx={{
+            minHeight: "100vh",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            textAlign: "center",
+            py: 8,
+          }}
+        >
+          <Typography variant="h2" fontWeight={800} sx={{ mb: 2 }}>
+            Counselor App
+          </Typography>
+
+          <Typography
+            variant="h6"
+            color="text.secondary"
+            sx={{ maxWidth: 600, mb: 4 }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            Track your daily routine with AI-powered motivation and professional
+            counselor support. Build healthy habits, one task at a time.
+          </Typography>
+
+          <Box sx={{ display: "flex", gap: 2, mb: 8 }}>
+            <Button
+              component={Link}
+              href="/login"
+              variant="contained"
+              size="large"
+              sx={{ px: 4, py: 1.5 }}
+            >
+              Sign In
+            </Button>
+            <Button
+              component={Link}
+              href="/register"
+              variant="outlined"
+              size="large"
+              sx={{ px: 4, py: 1.5 }}
+            >
+              Get Started
+            </Button>
+          </Box>
+
+          {/* Features Grid */}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
+              gap: 3,
+              width: "100%",
+              maxWidth: 900,
+            }}
           >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+            <Card sx={{ textAlign: "center", py: 3 }}>
+              <CardContent>
+                <CalendarMonth sx={{ fontSize: 40, color: "primary.main", mb: 1 }} />
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  Kanban Board
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Drag-and-drop task management with To Do, In Progress, and Done columns
+                </Typography>
+              </CardContent>
+            </Card>
+
+            <Card sx={{ textAlign: "center", py: 3 }}>
+              <CardContent>
+                <TrendingUp sx={{ fontSize: 40, color: "success.main", mb: 1 }} />
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  Time Tracking
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Track estimated and actual time with built-in timer
+                </Typography>
+              </CardContent>
+            </Card>
+
+            <Card sx={{ textAlign: "center", py: 3 }}>
+              <CardContent>
+                <Notifications sx={{ fontSize: 40, color: "warning.main", mb: 1 }} />
+                <Typography variant="h6" fontWeight={600} gutterBottom>
+                  AI Motivation
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Get AI-powered rewards and quotes to keep you motivated
+                </Typography>
+              </CardContent>
+            </Card>
+          </Box>
+
+          {/* User Types */}
+          <Box sx={{ mt: 6, width: "100%", maxWidth: 700 }}>
+            <Typography variant="h5" fontWeight={700} gutterBottom>
+              Choose Your Role
+            </Typography>
+            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" }, gap: 2, mt: 2 }}>
+              <Card>
+                <CardContent sx={{ py: 3, textAlign: "center" }}>
+                  <Person sx={{ fontSize: 40, color: "primary.main", mb: 1 }} />
+                  <Typography variant="h6" fontWeight={600} gutterBottom>
+                    Individual
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Track routines, complete tasks, receive AI motivation and feedback
+                  </Typography>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent sx={{ py: 3, textAlign: "center" }}>
+                  <SupervisorAccount sx={{ fontSize: 40, color: "secondary.main", mb: 1 }} />
+                  <Typography variant="h6" fontWeight={600} gutterBottom>
+                    Counselor
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Monitor individuals, view activities, and provide feedback
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Box>
+          </Box>
+        </Box>
+      </Container>
+    </Box>
+  )
 }

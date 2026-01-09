@@ -1,0 +1,112 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  password      String
+  role          String    @default("INDIVIDUAL") // COUNSELOR or INDIVIDUAL
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Counselor-Individual relationship
+  counselorId   String?
+  counselor     User?     @relation("CounselorIndividuals", fields: [counselorId], references: [id])
+  individuals   User[]    @relation("CounselorIndividuals")
+  
+  // Tasks owned by user
+  tasks         Task[]
+  
+  // Feedback given by counselor
+  feedbackGiven Feedback[] @relation("CounselorFeedback")
+  
+  // Feedback received by individual
+  feedbackReceived Feedback[] @relation("IndividualFeedback")
+  
+  // Notifications
+  notifications Notification[]
+  
+  // Task comments authored by counselor
+  taskComments  TaskComment[] @relation("TaskComments")
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  date        DateTime
+  status      String    @default("TODO") // TODO, IN_PROGRESS, DONE
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  // Time tracking
+  estimatedMinutes Int?
+  actualMinutes    Int?
+  startedAt        DateTime?
+  
+  // AI generated content
+  aiReward    String?
+  aiImageUrl  String?
+  
+  // Relation to user
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Task comments from counselor
+  comments    TaskComment[]
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  message   String
+  createdAt DateTime @default(now())
+  
+  // Task this comment belongs to
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  // Counselor who made the comment
+  authorId  String
+  author    User     @relation("TaskComments", fields: [authorId], references: [id])
+}
+
+model Feedback {
+  id           String   @id @default(cuid())
+  message      String
+  createdAt    DateTime @default(now())
+  
+  // Counselor who gave feedback
+  counselorId  String
+  counselor    User     @relation("CounselorFeedback", fields: [counselorId], references: [id])
+  
+  // Individual who received feedback
+  individualId String
+  individual   User     @relation("IndividualFeedback", fields: [individualId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  message   String
+  type      String   // REMINDER, FEEDBACK, MOTIVATION
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  // User who receives notification
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model MotivationalQuote {
+  id     String @id @default(cuid())
+  quote  String
+  author String
+}
