@@ -209,7 +209,7 @@ export default function RegisterPage() {
                                 </Select>
                             </FormControl>
 
-                            {formData.role === "INDIVIDUAL" && counselors.length > 0 && (
+                            {/* {formData.role === "INDIVIDUAL" && counselors.length > 0 && (
                                 <FormControl fullWidth sx={{ mb: 2 }}>
                                     <InputLabel>Select Counselor (Optional)</InputLabel>
                                     <Select
@@ -226,7 +226,7 @@ export default function RegisterPage() {
                                         ))}
                                     </Select>
                                 </FormControl>
-                            )}
+                            )} */}
 
                             <TextField
                                 fullWidth

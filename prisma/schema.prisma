@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -35,6 +36,9 @@ model User {
   
   // Task comments authored by counselor
   taskComments  TaskComment[] @relation("TaskComments")
+  
+  // Chat sessions
+  chatSessions  ChatSession[]
 }
 
 model Task {
@@ -109,4 +113,29 @@ model MotivationalQuote {
   id     String @id @default(cuid())
   quote  String
   author String
+}
+
+model ChatSession {
+  id        String   @id @default(cuid())
+  title     String   @default("New Chat")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // User who owns this chat session
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Messages in this session
+  messages  ChatMessage[]
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  role      String   // "user" or "assistant"
+  content   String
+  createdAt DateTime @default(now())
+  
+  // Session this message belongs to
+  sessionId String
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 }

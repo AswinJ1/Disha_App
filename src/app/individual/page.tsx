@@ -54,6 +54,8 @@ import {
     CheckCircle as CheckCircleIcon,
     Edit,
     Comment,
+    SmartToy,
+    Whatshot,
 } from "@mui/icons-material"
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd"
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from "date-fns"
@@ -109,6 +111,12 @@ interface MotivationalQuote {
     completedToday?: number
 }
 
+interface StreakData {
+    currentStreak: number
+    longestStreak: number
+    completedDates: string[]
+}
+
 const COLUMNS = [
     { id: "TODO", title: "To Do", color: "#1976d2" },
     { id: "IN_PROGRESS", title: "In Progress", color: "#ed6c02" },
@@ -142,6 +150,7 @@ export default function IndividualDashboard() {
     const [editDialogOpen, setEditDialogOpen] = useState(false)
     const [editTask, setEditTask] = useState<Task | null>(null)
     const [editForm, setEditForm] = useState({ title: "", description: "", estimatedMinutes: "" })
+    const [streakData, setStreakData] = useState<StreakData>({ currentStreak: 0, longestStreak: 0, completedDates: [] })
 
     const fetchTasks = useCallback(async (date: Date) => {
         try {
@@ -164,6 +173,54 @@ export default function IndividualDashboard() {
             if (res.ok) {
                 const data = await res.json()
                 setAllTasks(data)
+                
+                // Calculate streaks from completed tasks
+                const completedTasks = data.filter((t: Task) => t.status === "DONE" && t.completedAt)
+                const completedDatesSet = new Set<string>()
+                completedTasks.forEach((task: Task) => {
+                    if (task.completedAt) {
+                        completedDatesSet.add(format(new Date(task.completedAt), "yyyy-MM-dd"))
+                    }
+                })
+                const completedDates = Array.from(completedDatesSet).sort()
+                
+                // Calculate current streak
+                let currentStreak = 0
+                let longestStreak = 0
+                let tempStreak = 0
+                const today = new Date()
+                today.setHours(0, 0, 0, 0)
+                
+                // Check backwards from today
+                const checkDate = new Date(today)
+                while (true) {
+                    const dateStr = format(checkDate, "yyyy-MM-dd")
+                    if (completedDatesSet.has(dateStr)) {
+                        currentStreak++
+                        checkDate.setDate(checkDate.getDate() - 1)
+                    } else {
+                        break
+                    }
+                }
+                
+                // Calculate longest streak
+                for (let i = 0; i < completedDates.length; i++) {
+                    if (i === 0) {
+                        tempStreak = 1
+                    } else {
+                        const prevDate = new Date(completedDates[i - 1])
+                        const currDate = new Date(completedDates[i])
+                        const diffDays = Math.floor((currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24))
+                        if (diffDays === 1) {
+                            tempStreak++
+                        } else {
+                            tempStreak = 1
+                        }
+                    }
+                    longestStreak = Math.max(longestStreak, tempStreak)
+                }
+                
+                setStreakData({ currentStreak, longestStreak, completedDates })
             }
         } catch (error) {
             console.error("Failed to fetch all tasks:", error)
@@ -433,13 +490,17 @@ export default function IndividualDashboard() {
 
             <Box sx={{ flex: 1, overflow: "auto", p: 1 }}>
                 <List>
-                    <ListItemButton selected sx={{ borderRadius: 2 }}>
+                    <ListItemButton selected>
                         <ListItemIcon><Home sx={{ color: "primary.main" }} /></ListItemIcon>
                         <ListItemText primary="Kanban Board" />
                     </ListItemButton>
-                    <ListItemButton component={Link} href="/individual/analytics" sx={{ borderRadius: 2 }}>
+                    <ListItemButton component={Link} href="/individual/analytics">
                         <ListItemIcon><Analytics /></ListItemIcon>
                         <ListItemText primary="Analytics" />
+                    </ListItemButton>
+                    <ListItemButton component={Link} href="/individual/ai-assistant">
+                        <ListItemIcon><SmartToy /></ListItemIcon>
+                        <ListItemText primary="AI Assistant" />
                     </ListItemButton>
                 </List>
 
@@ -474,6 +535,8 @@ export default function IndividualDashboard() {
                             const dayTasks = getTasksForDay(day)
                             const isSelected = isSameDay(day, selectedDate)
                             const isToday = isSameDay(day, new Date())
+                            const dateStr = format(day, "yyyy-MM-dd")
+                            const hasCompletedTask = streakData.completedDates.includes(dateStr)
 
                             return (
                                 <Box
@@ -481,10 +544,9 @@ export default function IndividualDashboard() {
                                     onClick={() => setSelectedDate(day)}
                                     sx={{
                                         py: 0.25,
-                                        borderRadius: 0.5,
                                         cursor: "pointer",
-                                        bgcolor: isSelected ? "primary.main" : "transparent",
-                                        color: isSelected ? "white" : "inherit",
+                                        bgcolor: isSelected ? "primary.main" : hasCompletedTask ? "success.light" : "transparent",
+                                        color: isSelected ? "white" : hasCompletedTask ? "success.dark" : "inherit",
                                         fontWeight: isToday ? 700 : 400,
                                         fontSize: "0.7rem",
                                         "&:hover": { bgcolor: isSelected ? "primary.main" : "action.hover" },
@@ -498,6 +560,46 @@ export default function IndividualDashboard() {
                             )
                         })}
                     </Box>
+                </Box>
+
+                <Divider sx={{ my: 2 }} />
+
+                {/* Streak Stats */}
+                <Typography variant="caption" color="text.secondary" sx={{ px: 2, fontWeight: 600, textTransform: "uppercase" }}>
+                    Streaks
+                </Typography>
+                <Box sx={{ px: 2, mt: 1 }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1 }}>
+                        <Whatshot sx={{ color: streakData.currentStreak > 0 ? "warning.main" : "text.disabled", fontSize: 28 }} />
+                        <Box>
+                            <Typography variant="h5" fontWeight={700} color={streakData.currentStreak > 0 ? "warning.main" : "text.secondary"}>
+                                {streakData.currentStreak}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                Current Streak
+                            </Typography>
+                        </Box>
+                    </Box>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <EmojiEvents sx={{ color: "success.main", fontSize: 24 }} />
+                        <Box>
+                            <Typography variant="h6" fontWeight={600} color="success.main">
+                                {streakData.longestStreak}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                Longest Streak
+                            </Typography>
+                        </Box>
+                    </Box>
+                    {streakData.currentStreak >= 3 && (
+                        <Chip 
+                            icon={<Whatshot />} 
+                            label="On Fire! 🔥" 
+                            color="warning" 
+                            size="small" 
+                            sx={{ mt: 1, width: "100%" }}
+                        />
+                    )}
                 </Box>
             </Box>
         </Box>
@@ -655,6 +757,7 @@ export default function IndividualDashboard() {
                             color: "white",
                             position: "relative",
                             overflow: "hidden",
+                            borderRadius: 0,
                         }}
                     >
                         <CardContent sx={{ py: 3 }}>
@@ -696,28 +799,43 @@ export default function IndividualDashboard() {
                             <Typography variant="h6" fontWeight={600} sx={{ mb: 2, display: "flex", alignItems: "center", gap: 1 }}>
                                 <Message color="primary" />
                                 Messages from Your Counselor
+                                <Typography variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
+                                    {format(selectedDate, "MMM d, yyyy")}
+                                </Typography>
                             </Typography>
                             <Box sx={{ maxHeight: 200, overflow: "auto" }}>
-                                {feedback.slice(0, 3).map((fb) => (
-                                    <Box
-                                        key={fb.id}
-                                        sx={{
-                                            p: 2,
-                                            mb: 1,
-                                            bgcolor: "action.hover",
-                                            borderRadius: 2,
-                                            borderLeft: "4px solid",
-                                            borderColor: "primary.main",
-                                        }}
-                                    >
-                                        <Typography variant="body2" sx={{ mb: 0.5 }}>
-                                            {fb.message}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            From {fb.counselor.name} • {format(new Date(fb.createdAt), "MMM d, yyyy")}
-                                        </Typography>
-                                    </Box>
-                                ))}
+                                {(() => {
+                                    const feedbackForDate = feedback.filter((fb) => 
+                                        format(new Date(fb.createdAt), "yyyy-MM-dd") === format(selectedDate, "yyyy-MM-dd")
+                                    )
+                                    if (feedbackForDate.length === 0) {
+                                        return (
+                                            <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", py: 2 }}>
+                                                No feedback for this date
+                                            </Typography>
+                                        )
+                                    }
+                                    return feedbackForDate.map((fb) => (
+                                        <Box
+                                            key={fb.id}
+                                            sx={{
+                                                p: 2,
+                                                mb: 1,
+                                                bgcolor: "action.hover",
+                                                borderRadius: 0,
+                                                borderLeft: "4px solid",
+                                                borderColor: "primary.main",
+                                            }}
+                                        >
+                                            <Typography variant="body2" sx={{ mb: 0.5 }}>
+                                                {fb.message}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                From {fb.counselor.name} • {format(new Date(fb.createdAt), "h:mm a")}
+                                            </Typography>
+                                        </Box>
+                                    ))
+                                })()}
                             </Box>
                         </CardContent>
                     </Card>
@@ -751,7 +869,7 @@ export default function IndividualDashboard() {
                                     }}
                                 >
                                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                        <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: column.color }} />
+                                        <Box sx={{ width: 8, height: 8, borderRadius: "50%"}} />
                                         <Typography variant="subtitle1" fontWeight={600}>
                                             {column.title}
                                         </Typography>
@@ -768,7 +886,7 @@ export default function IndividualDashboard() {
                                                 bgcolor: snapshot.isDraggingOver ? "action.hover" : "background.paper",
                                                 border: "1px solid",
                                                 borderColor: snapshot.isDraggingOver ? "primary.main" : "divider",
-                                                borderRadius: 2,
+                                                borderRadius: 0,
                                                 p: 1,
                                                 minHeight: 400,
                                                 transition: "all 0.2s",
@@ -787,6 +905,7 @@ export default function IndividualDashboard() {
                                                                 boxShadow: snapshot.isDragging ? 4 : 1,
                                                                 cursor: "grab",
                                                                 "&:active": { cursor: "grabbing" },
+                                                                borderRadius: 0,
                                                             }}
                                                         >
                                                             <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>

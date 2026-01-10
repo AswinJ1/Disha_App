@@ -47,9 +47,13 @@ import {
     LightMode,
     PersonAdd,
     Email,
+    Close,
+    SmartToy,
+    Message,
 } from "@mui/icons-material"
 import Link from "next/link"
 import { useThemeMode } from "@/theme/ThemeContext"
+import { format } from "date-fns"
 
 interface Individual {
     id: string
@@ -62,7 +66,16 @@ interface Individual {
     totalTasks: number
 }
 
+interface Notification {
+    id: string
+    message: string
+    type: string
+    read: boolean
+    createdAt: string
+}
+
 const drawerWidth = 260
+const notificationsWidth = 350
 
 export default function CounselorDashboard() {
     const muiTheme = useMuiTheme()
@@ -81,6 +94,9 @@ export default function CounselorDashboard() {
         totalTasksCompleted: 0,
         averageCompletion: 0,
     })
+    const [notificationsOpen, setNotificationsOpen] = useState(false)
+    const [notifications, setNotifications] = useState<Notification[]>([])
+    const [unreadCount, setUnreadCount] = useState(0)
 
     const fetchIndividuals = useCallback(async () => {
         try {
@@ -104,6 +120,44 @@ export default function CounselorDashboard() {
     useEffect(() => {
         fetchIndividuals()
     }, [fetchIndividuals])
+
+    const fetchNotifications = useCallback(async () => {
+        try {
+            const res = await fetch("/api/notifications")
+            if (res.ok) {
+                const data = await res.json()
+                setNotifications(data.notifications)
+                setUnreadCount(data.unreadCount)
+            }
+        } catch (error) {
+            console.error("Failed to fetch notifications:", error)
+        }
+    }, [])
+
+    const markNotificationsRead = async () => {
+        try {
+            await fetch("/api/notifications", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ markAllRead: true }),
+            })
+            setUnreadCount(0)
+            setNotifications(notifications.map(n => ({ ...n, read: true })))
+        } catch (error) {
+            console.error("Failed to mark notifications read:", error)
+        }
+    }
+
+    useEffect(() => {
+        fetchNotifications()
+    }, [fetchNotifications])
+
+    const handleOpenNotifications = () => {
+        setNotificationsOpen(true)
+        if (unreadCount > 0) {
+            markNotificationsRead()
+        }
+    }
 
     useEffect(() => {
         setDrawerOpen(!isMobile)
@@ -161,17 +215,21 @@ export default function CounselorDashboard() {
 
             <Box sx={{ flex: 1, overflow: "auto", p: 1 }}>
                 <List>
-                    <ListItemButton selected sx={{ borderRadius: 2 }}>
+                    <ListItemButton selected>
                         <ListItemIcon><Home sx={{ color: "primary.main" }} /></ListItemIcon>
                         <ListItemText primary="Dashboard" />
                     </ListItemButton>
-                    <ListItemButton sx={{ borderRadius: 2 }}>
+                    <ListItemButton>
                         <ListItemIcon><People /></ListItemIcon>
                         <ListItemText primary="Individuals" />
                     </ListItemButton>
-                    <ListItemButton sx={{ borderRadius: 2 }}>
+                    <ListItemButton>
                         <ListItemIcon><Analytics /></ListItemIcon>
                         <ListItemText primary="Reports" />
+                    </ListItemButton>
+                    <ListItemButton component={Link} href="/counselor/ai-assistant">
+                        <ListItemIcon><SmartToy /></ListItemIcon>
+                        <ListItemText primary="AI Assistant" />
                     </ListItemButton>
                 </List>
 
@@ -222,8 +280,8 @@ export default function CounselorDashboard() {
                     <Typography variant="h6" fontWeight={600} sx={{ flexGrow: 1 }}>
                         Counselor Dashboard
                     </Typography>
-                    <Badge badgeContent={2} color="error" sx={{ mr: 2 }}>
-                        <IconButton color="inherit">
+                    <Badge badgeContent={unreadCount} color="error" sx={{ mr: 2 }}>
+                        <IconButton color="inherit" onClick={handleOpenNotifications}>
                             <Notifications />
                         </IconButton>
                     </Badge>
@@ -252,6 +310,75 @@ export default function CounselorDashboard() {
             >
                 <Toolbar />
                 {sidebarContent}
+            </Drawer>
+
+            {/* Notifications Drawer */}
+            <Drawer
+                anchor="right"
+                open={notificationsOpen}
+                onClose={() => setNotificationsOpen(false)}
+                sx={{
+                    "& .MuiDrawer-paper": {
+                        width: isMobile ? "100%" : notificationsWidth,
+                        boxSizing: "border-box",
+                        bgcolor: "background.paper",
+                    },
+                }}
+            >
+                <Box sx={{ p: 2, borderBottom: "1px solid", borderColor: "divider", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <Typography variant="h6" fontWeight={600}>
+                        <Notifications sx={{ mr: 1, verticalAlign: "middle" }} />
+                        Notifications
+                    </Typography>
+                    <IconButton onClick={() => setNotificationsOpen(false)}>
+                        <Close />
+                    </IconButton>
+                </Box>
+                <Box sx={{ p: 2, overflow: "auto", flex: 1 }}>
+                    {notifications.length === 0 ? (
+                        <Box sx={{ textAlign: "center", py: 4 }}>
+                            <Message sx={{ fontSize: 48, color: "text.disabled", mb: 2 }} />
+                            <Typography color="text.secondary">
+                                No notifications yet
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                Updates about your individuals will appear here
+                            </Typography>
+                        </Box>
+                    ) : (
+                        notifications.map((notification) => (
+                            <Card
+                                key={notification.id}
+                                sx={{
+                                    mb: 2,
+                                    bgcolor: notification.read ? "background.paper" : "action.hover",
+                                    borderLeft: "3px solid",
+                                    borderColor: notification.type === "TASK_COMPLETED" ? "success.main" : "primary.main",
+                                }}
+                            >
+                                <CardContent sx={{ py: 1.5 }}>
+                                    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
+                                        <CheckCircle color="success" fontSize="small" />
+                                        <Box sx={{ flex: 1 }}>
+                                            <Chip
+                                                label={notification.type === "TASK_COMPLETED" ? "Task Completed" : notification.type}
+                                                size="small"
+                                                color={notification.type === "TASK_COMPLETED" ? "success" : "primary"}
+                                                sx={{ mb: 1, height: 20, fontSize: "0.65rem" }}
+                                            />
+                                            <Typography variant="body2">
+                                                {notification.message}
+                                            </Typography>
+                                            <Typography variant="caption" color="text.secondary">
+                                                {format(new Date(notification.createdAt), "MMM d, yyyy 'at' h:mm a")}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        ))
+                    )}
+                </Box>
             </Drawer>
 
             {/* Main Content */}

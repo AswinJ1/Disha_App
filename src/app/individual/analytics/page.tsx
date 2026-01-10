@@ -37,6 +37,7 @@ import {
     Home,
     DarkMode,
     LightMode,
+    SmartToy,
 } from "@mui/icons-material"
 import {
     BarChart,
@@ -210,6 +211,10 @@ export default function IndividualAnalytics() {
                     <ListItemButton selected sx={{ borderRadius: 2 }}>
                         <ListItemIcon><AnalyticsIcon sx={{ color: "primary.main" }} /></ListItemIcon>
                         <ListItemText primary="Analytics" />
+                    </ListItemButton>
+                    <ListItemButton component={Link} href="/individual/ai-assistant" sx={{ borderRadius: 2 }}>
+                        <ListItemIcon><SmartToy /></ListItemIcon>
+                        <ListItemText primary="AI Assistant" />
                     </ListItemButton>
                 </List>
             </Box>

@@ -74,7 +74,7 @@ export const theme = createTheme({
         },
     },
     shape: {
-        borderRadius: 8,
+        borderRadius: 0,
     },
     components: {
         MuiButton: {
@@ -82,7 +82,7 @@ export const theme = createTheme({
                 root: {
                     textTransform: "none",
                     fontWeight: 600,
-                    borderRadius: 8,
+                    borderRadius: 0,
                     padding: "8px 20px",
                 },
                 contained: {
@@ -98,7 +98,7 @@ export const theme = createTheme({
                 root: {
                     boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
                     border: "1px solid #e0e0e0",
-                    borderRadius: 12,
+                    borderRadius: 0,
                 },
             },
         },
@@ -106,7 +106,7 @@ export const theme = createTheme({
             styleOverrides: {
                 root: {
                     "& .MuiOutlinedInput-root": {
-                        borderRadius: 8,
+                        borderRadius: 0,
                     },
                 },
             },
@@ -128,7 +128,7 @@ export const theme = createTheme({
         MuiListItemButton: {
             styleOverrides: {
                 root: {
-                    borderRadius: 8,
+                    borderRadius: 0,
                     marginBottom: 4,
                     "&.Mui-selected": {
                         backgroundColor: "rgba(25, 118, 210, 0.08)",

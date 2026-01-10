@@ -1,4 +1,4 @@
-// Famous motivational quotes for reminder notifications
+// Famous motivational quotes for reminder notifications (fallback)
 export const motivationalQuotes = [
     { quote: "The secret of getting ahead is getting started.", author: "Mark Twain" },
     { quote: "It does not matter how slowly you go as long as you do not stop.", author: "Confucius" },
@@ -7,7 +7,6 @@ export const motivationalQuotes = [
     { quote: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
     { quote: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
     { quote: "The future belongs to those who believe in the beauty of their dreams.", author: "Eleanor Roosevelt" },
-    { quote: "Start where you are. Use what you have. Do what you can.", author: "Arthur Ashe" },
     { quote: "Your limitation—it's only your imagination.", author: "Unknown" },
     { quote: "Push yourself, because no one else is going to do it for you.", author: "Unknown" },
     { quote: "Great things never come from comfort zones.", author: "Unknown" },
@@ -24,6 +23,30 @@ export const motivationalQuotes = [
 
 export function getRandomQuote() {
     return motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]
+}
+
+// Fetch a random quote from ZenQuotes API
+export async function fetchZenQuote(): Promise<{ quote: string; author: string }> {
+    try {
+        const response = await fetch("https://zenquotes.io/api/random")
+        
+        if (!response.ok) {
+            throw new Error("Failed to fetch quote from ZenQuotes")
+        }
+        
+        const data = await response.json()
+        // ZenQuotes returns an array with one quote object: [{ q: "quote", a: "author", h: "html" }]
+        if (data && data[0]) {
+            return {
+                quote: data[0].q,
+                author: data[0].a,
+            }
+        }
+        throw new Error("Invalid response format from ZenQuotes")
+    } catch (error) {
+        console.error("Error fetching from ZenQuotes:", error)
+        return getRandomQuote()
+    }
 }
 
 export function getMotivationalMessage(taskTitle: string): string {
