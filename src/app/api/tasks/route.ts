@@ -56,11 +56,15 @@ export async function POST(request: Request) {
 
         const { title, description, date, estimatedMinutes } = await request.json()
 
+        // Parse date string (yyyy-MM-dd) and set to noon to avoid timezone issues
+        const taskDate = new Date(date)
+        taskDate.setHours(12, 0, 0, 0)
+
         const task = await prisma.task.create({
             data: {
                 title,
                 description,
-                date: new Date(date),
+                date: taskDate,
                 status: "TODO",
                 estimatedMinutes: estimatedMinutes ? parseInt(estimatedMinutes) : null,
                 userId: session.user.id,

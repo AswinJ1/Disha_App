@@ -308,12 +308,13 @@ export default function IndividualDashboard() {
         if (!newTask.title.trim()) return
 
         try {
+            const dateStr = format(selectedDate, "yyyy-MM-dd")
             const res = await fetch("/api/tasks", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     ...newTask,
-                    date: selectedDate.toISOString(),
+                    date: dateStr,
                 }),
             })
 
