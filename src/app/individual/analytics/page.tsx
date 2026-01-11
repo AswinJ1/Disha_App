@@ -56,7 +56,7 @@ import {
 } from "recharts"
 import html2canvas from "html2canvas"
 import jsPDF from "jspdf"
-import { format, subDays, startOfWeek, endOfWeek, eachDayOfInterval } from "date-fns"
+import { format, subDays, subMonths, startOfWeek, endOfWeek, eachDayOfInterval } from "date-fns"
 import Link from "next/link"
 import { useThemeMode } from "@/theme/ThemeContext"
 
@@ -66,6 +66,9 @@ interface Task {
     date: string
     completed: boolean
     status: string
+    completedAt: string | null
+    actualMinutes: number | null
+    estimatedMinutes: number | null
 }
 
 const drawerWidth = 260
@@ -103,18 +106,59 @@ export default function IndividualAnalytics() {
         setDrawerOpen(!isMobile)
     }, [isMobile])
 
+    // Get time range in days based on selection
+    const getTimeRangeDays = () => {
+        switch (timeRange) {
+            case "week": return 7
+            case "month": return 30
+            case "2months": return 60
+            case "3months": return 90
+            case "6months": return 180
+            case "year": return 365
+            default: return 7
+        }
+    }
+
+    // Filter tasks based on time range
+    const getFilteredTasks = () => {
+        const days = getTimeRangeDays()
+        const startDate = subDays(new Date(), days)
+        return tasks.filter(t => new Date(t.date) >= startDate)
+    }
+
     const getDaysData = () => {
-        const days = timeRange === "week" ? 7 : 30
+        const days = getTimeRangeDays()
+        // For longer periods, aggregate by week or month
+        if (days > 60) {
+            // Aggregate by month
+            const months = Math.ceil(days / 30)
+            return Array.from({ length: months }, (_, i) => {
+                const monthStart = subMonths(new Date(), months - 1 - i)
+                const monthEnd = subMonths(new Date(), months - 2 - i)
+                const monthTasks = tasks.filter((t) => {
+                    const taskDate = new Date(t.date)
+                    return taskDate >= monthStart && taskDate < (i === months - 1 ? new Date() : monthEnd)
+                })
+                return {
+                    date: format(monthStart, "MMM yyyy"),
+                    completed: monthTasks.filter((t) => t.completed || t.status === "DONE").length,
+                    pending: monthTasks.filter((t) => !t.completed && t.status !== "DONE").length,
+                    total: monthTasks.length,
+                    hours: Math.round(monthTasks.reduce((acc, t) => acc + (t.actualMinutes || 0), 0) / 60 * 10) / 10,
+                }
+            })
+        }
         return Array.from({ length: days }, (_, i) => {
             const date = subDays(new Date(), days - 1 - i)
             const dayTasks = tasks.filter(
                 (t) => format(new Date(t.date), "yyyy-MM-dd") === format(date, "yyyy-MM-dd")
             )
             return {
-                date: format(date, timeRange === "week" ? "EEE" : "MMM d"),
+                date: format(date, days <= 7 ? "EEE" : "MMM d"),
                 completed: dayTasks.filter((t) => t.completed || t.status === "DONE").length,
                 pending: dayTasks.filter((t) => !t.completed && t.status !== "DONE").length,
                 total: dayTasks.length,
+                hours: Math.round(dayTasks.reduce((acc, t) => acc + (t.actualMinutes || 0), 0) / 60 * 10) / 10,
             }
         })
     }
@@ -176,8 +220,11 @@ export default function IndividualAnalytics() {
     const dailyData = getDaysData()
     const pieData = getPieData()
     const weeklyProgress = getWeeklyProgress()
-    const totalCompleted = tasks.filter((t) => t.completed || t.status === "DONE").length
-    const totalPending = tasks.filter((t) => !t.completed && t.status !== "DONE").length
+    const filteredTasks = getFilteredTasks()
+    const totalCompleted = filteredTasks.filter((t) => t.completed || t.status === "DONE").length
+    const totalPending = filteredTasks.filter((t) => !t.completed && t.status !== "DONE").length
+    const totalHoursSpent = Math.round(filteredTasks.reduce((acc, t) => acc + (t.actualMinutes || 0), 0) / 60 * 10) / 10
+    const totalEstimatedHours = Math.round(filteredTasks.reduce((acc, t) => acc + (t.estimatedMinutes || 0), 0) / 60 * 10) / 10
 
     const COLORS = [muiTheme.palette.success.main, muiTheme.palette.warning.main]
 
@@ -299,6 +346,10 @@ export default function IndividualAnalytics() {
                                 >
                                     <MenuItem value="week">Last 7 Days</MenuItem>
                                     <MenuItem value="month">Last 30 Days</MenuItem>
+                                    <MenuItem value="2months">Last 2 Months</MenuItem>
+                                    <MenuItem value="3months">Last 3 Months</MenuItem>
+                                    <MenuItem value="6months">Last 6 Months</MenuItem>
+                                    <MenuItem value="year">Last 12 Months</MenuItem>
                                 </Select>
                             </FormControl>
                             <Button variant="outlined" startIcon={<Download />} onClick={() => handleDownload("png")}>
@@ -312,11 +363,11 @@ export default function IndividualAnalytics() {
 
                     <Box ref={chartRef} sx={{ p: 2, bgcolor: "background.paper", borderRadius: 2 }}>
                         {/* Stats Cards */}
-                        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: 2, mb: 3 }}>
+                        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(5, 1fr)" }, gap: 2, mb: 3 }}>
                             <Card>
                                 <CardContent>
                                     <Typography color="text.secondary" variant="body2">Total Tasks</Typography>
-                                    <Typography variant="h3" fontWeight={700}>{tasks.length}</Typography>
+                                    <Typography variant="h3" fontWeight={700}>{filteredTasks.length}</Typography>
                                 </CardContent>
                             </Card>
                             <Card>
@@ -329,6 +380,18 @@ export default function IndividualAnalytics() {
                                 <CardContent>
                                     <Typography color="text.secondary" variant="body2">Pending</Typography>
                                     <Typography variant="h3" fontWeight={700} color="warning.main">{totalPending}</Typography>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent>
+                                    <Typography color="text.secondary" variant="body2">Hours Spent</Typography>
+                                    <Typography variant="h3" fontWeight={700} color="info.main">{totalHoursSpent}h</Typography>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent>
+                                    <Typography color="text.secondary" variant="body2">Estimated Hours</Typography>
+                                    <Typography variant="h3" fontWeight={700} color="secondary.main">{totalEstimatedHours}h</Typography>
                                 </CardContent>
                             </Card>
                         </Box>

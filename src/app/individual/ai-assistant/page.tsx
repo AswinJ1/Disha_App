@@ -42,6 +42,7 @@ import Link from "next/link"
 import { useThemeMode } from "@/theme/ThemeContext"
 import { signOut } from "next-auth/react"
 import { isToday, isYesterday, isThisWeek, isThisMonth } from "date-fns"
+import ReactMarkdown from "react-markdown"
 
 interface Message {
     id?: string
@@ -462,9 +463,22 @@ export default function IndividualAIAssistant() {
                                         borderRadius: 0,
                                     }}>
                                         <CardContent sx={{ py: 1.5, px: 2, "&:last-child": { pb: 1.5 } }}>
-                                            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
-                                                {message.content}
-                                            </Typography>
+                                            {message.role === "assistant" ? (
+                                                <Box sx={{ 
+                                                    "& p": { m: 0, mb: 1, "&:last-child": { mb: 0 } },
+                                                    "& strong": { fontWeight: 600 },
+                                                    "& ul, & ol": { m: 0, pl: 2.5 },
+                                                    "& li": { mb: 0.5 },
+                                                    "& h1, & h2, & h3, & h4": { mt: 1, mb: 0.5 },
+                                                    fontSize: "0.875rem",
+                                                }}>
+                                                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                                                </Box>
+                                            ) : (
+                                                <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                                                    {message.content}
+                                                </Typography>
+                                            )}
                                         </CardContent>
                                     </Card>
                                     {message.role === "user" && (

@@ -152,6 +152,64 @@ export default function IndividualDashboard() {
     const [editForm, setEditForm] = useState({ title: "", description: "", estimatedMinutes: "" })
     const [streakData, setStreakData] = useState<StreakData>({ currentStreak: 0, longestStreak: 0, completedDates: [] })
 
+    // Calculate streak data from tasks
+    const calculateStreakData = useCallback((tasksList: Task[]) => {
+        const completedTasks = tasksList.filter((t: Task) => t.status === "DONE" && t.completedAt)
+        const completedDatesSet = new Set<string>()
+        completedTasks.forEach((task: Task) => {
+            if (task.completedAt) {
+                completedDatesSet.add(format(new Date(task.completedAt), "yyyy-MM-dd"))
+            }
+        })
+        const completedDates = Array.from(completedDatesSet).sort()
+        
+        // Calculate current streak
+        let currentStreak = 0
+        let longestStreak = 0
+        let tempStreak = 0
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const todayStr = format(today, "yyyy-MM-dd")
+        
+        // Check backwards from today (or yesterday if today has no completions yet)
+        const checkDate = new Date(today)
+        
+        // If today has completions, start from today
+        // If not, start from yesterday (streak is still valid until end of today)
+        if (!completedDatesSet.has(todayStr)) {
+            checkDate.setDate(checkDate.getDate() - 1)
+        }
+        
+        while (true) {
+            const dateStr = format(checkDate, "yyyy-MM-dd")
+            if (completedDatesSet.has(dateStr)) {
+                currentStreak++
+                checkDate.setDate(checkDate.getDate() - 1)
+            } else {
+                break
+            }
+        }
+        
+        // Calculate longest streak
+        for (let i = 0; i < completedDates.length; i++) {
+            if (i === 0) {
+                tempStreak = 1
+            } else {
+                const prevDate = new Date(completedDates[i - 1])
+                const currDate = new Date(completedDates[i])
+                const diffDays = Math.floor((currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24))
+                if (diffDays === 1) {
+                    tempStreak++
+                } else {
+                    tempStreak = 1
+                }
+            }
+            longestStreak = Math.max(longestStreak, tempStreak)
+        }
+        
+        return { currentStreak, longestStreak, completedDates }
+    }, [])
+
     const fetchTasks = useCallback(async (date: Date) => {
         try {
             const dateStr = format(date, "yyyy-MM-dd")
@@ -174,58 +232,14 @@ export default function IndividualDashboard() {
                 const data = await res.json()
                 setAllTasks(data)
                 
-                // Calculate streaks from completed tasks
-                const completedTasks = data.filter((t: Task) => t.status === "DONE" && t.completedAt)
-                const completedDatesSet = new Set<string>()
-                completedTasks.forEach((task: Task) => {
-                    if (task.completedAt) {
-                        completedDatesSet.add(format(new Date(task.completedAt), "yyyy-MM-dd"))
-                    }
-                })
-                const completedDates = Array.from(completedDatesSet).sort()
-                
-                // Calculate current streak
-                let currentStreak = 0
-                let longestStreak = 0
-                let tempStreak = 0
-                const today = new Date()
-                today.setHours(0, 0, 0, 0)
-                
-                // Check backwards from today
-                const checkDate = new Date(today)
-                while (true) {
-                    const dateStr = format(checkDate, "yyyy-MM-dd")
-                    if (completedDatesSet.has(dateStr)) {
-                        currentStreak++
-                        checkDate.setDate(checkDate.getDate() - 1)
-                    } else {
-                        break
-                    }
-                }
-                
-                // Calculate longest streak
-                for (let i = 0; i < completedDates.length; i++) {
-                    if (i === 0) {
-                        tempStreak = 1
-                    } else {
-                        const prevDate = new Date(completedDates[i - 1])
-                        const currDate = new Date(completedDates[i])
-                        const diffDays = Math.floor((currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24))
-                        if (diffDays === 1) {
-                            tempStreak++
-                        } else {
-                            tempStreak = 1
-                        }
-                    }
-                    longestStreak = Math.max(longestStreak, tempStreak)
-                }
-                
-                setStreakData({ currentStreak, longestStreak, completedDates })
+                // Calculate and update streak data
+                const newStreakData = calculateStreakData(data)
+                setStreakData(newStreakData)
             }
         } catch (error) {
             console.error("Failed to fetch all tasks:", error)
         }
-    }, [])
+    }, [calculateStreakData])
 
     const fetchNotifications = useCallback(async () => {
         try {
@@ -337,8 +351,32 @@ export default function IndividualDashboard() {
     const handleDragEnd = async (result: DropResult) => {
         if (!result.destination) return
 
-        const { draggableId, destination } = result
+        const { draggableId, destination, source } = result
         const newStatus = destination.droppableId
+        const oldStatus = source.droppableId
+
+        // If dropped in the same column, no need to update
+        if (newStatus === oldStatus) return
+
+        // Optimistic update - update UI immediately
+        const taskToUpdate = tasks.find(t => t.id === draggableId)
+        if (taskToUpdate) {
+            const updatedTask = { 
+                ...taskToUpdate, 
+                status: newStatus,
+                completed: newStatus === "DONE",
+                completedAt: newStatus === "DONE" ? new Date().toISOString() : null
+            }
+            const newTasks = tasks.map(t => t.id === draggableId ? updatedTask : t)
+            const newAllTasks = allTasks.map(t => t.id === draggableId ? updatedTask : t)
+            
+            setTasks(newTasks)
+            setAllTasks(newAllTasks)
+            
+            // Recalculate streak data immediately for optimistic update
+            const newStreakData = calculateStreakData(newAllTasks)
+            setStreakData(newStreakData)
+        }
 
         try {
             const res = await fetch("/api/tasks", {
@@ -349,14 +387,30 @@ export default function IndividualDashboard() {
 
             if (res.ok) {
                 const updatedTask = await res.json()
+                // Update with server response to ensure consistency
+                setTasks(prevTasks => 
+                    prevTasks.map(t => t.id === draggableId ? updatedTask : t)
+                )
+                setAllTasks(prevTasks => {
+                    const updated = prevTasks.map(t => t.id === draggableId ? updatedTask : t)
+                    // Recalculate streak with server data
+                    const newStreakData = calculateStreakData(updated)
+                    setStreakData(newStreakData)
+                    return updated
+                })
                 if (updatedTask.status === "DONE" && updatedTask.aiReward) {
                     setRewardSnackbar({ open: true, message: updatedTask.aiReward })
                 }
+            } else {
+                // Revert on error - refetch to restore correct state
                 fetchTasks(selectedDate)
                 fetchAllTasks()
             }
         } catch (error) {
             console.error("Failed to update task status:", error)
+            // Revert on error - refetch to restore correct state
+            fetchTasks(selectedDate)
+            fetchAllTasks()
         }
     }
 

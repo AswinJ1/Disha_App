@@ -28,6 +28,10 @@ import {
     useTheme as useMuiTheme,
     Alert,
     Snackbar,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
 } from "@mui/material"
 import {
     ArrowBack,
@@ -54,7 +58,7 @@ import {
     ResponsiveContainer,
 } from "recharts"
 import Link from "next/link"
-import { format, subDays } from "date-fns"
+import { format, subDays, subMonths } from "date-fns"
 import { useThemeMode } from "@/theme/ThemeContext"
 
 interface Individual {
@@ -72,6 +76,8 @@ interface Task {
     status: string
     completed: boolean
     completedAt: string | null
+    actualMinutes: number | null
+    estimatedMinutes: number | null
 }
 
 interface Feedback {
@@ -94,6 +100,7 @@ export default function IndividualDetailPage() {
     const [feedbackMessage, setFeedbackMessage] = useState("")
     const [sending, setSending] = useState(false)
     const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" as "success" | "error" })
+    const [timeRange, setTimeRange] = useState("week")
 
     const fetchIndividual = useCallback(async () => {
         try {
@@ -146,24 +153,70 @@ export default function IndividualDetailPage() {
         }
     }
 
+    // Get time range in days based on selection
+    const getTimeRangeDays = () => {
+        switch (timeRange) {
+            case "week": return 7
+            case "month": return 30
+            case "2months": return 60
+            case "3months": return 90
+            case "6months": return 180
+            case "year": return 365
+            default: return 7
+        }
+    }
+
+    // Filter tasks based on time range
+    const getFilteredTasks = () => {
+        if (!individual) return []
+        const days = getTimeRangeDays()
+        const startDate = subDays(new Date(), days)
+        return individual.tasks.filter(t => new Date(t.date) >= startDate)
+    }
+
     const getWeeklyData = () => {
         if (!individual) return []
-        return Array.from({ length: 7 }, (_, i) => {
-            const date = subDays(new Date(), 6 - i)
+        const days = getTimeRangeDays()
+        
+        if (days > 60) {
+            // Aggregate by month for longer periods
+            const months = Math.ceil(days / 30)
+            return Array.from({ length: months }, (_, i) => {
+                const monthStart = subMonths(new Date(), months - 1 - i)
+                const monthEnd = subMonths(new Date(), months - 2 - i)
+                const monthTasks = individual.tasks.filter((t) => {
+                    const taskDate = new Date(t.date)
+                    return taskDate >= monthStart && taskDate < (i === months - 1 ? new Date() : monthEnd)
+                })
+                return {
+                    day: format(monthStart, "MMM"),
+                    completed: monthTasks.filter((t) => t.completed || t.status === "DONE").length,
+                    total: monthTasks.length,
+                    hours: Math.round(monthTasks.reduce((acc, t) => acc + (t.actualMinutes || 0), 0) / 60 * 10) / 10,
+                }
+            })
+        }
+        
+        return Array.from({ length: days }, (_, i) => {
+            const date = subDays(new Date(), days - 1 - i)
             const dayTasks = individual.tasks.filter(
                 (t) => format(new Date(t.date), "yyyy-MM-dd") === format(date, "yyyy-MM-dd")
             )
             return {
-                day: format(date, "EEE"),
+                day: format(date, days <= 7 ? "EEE" : "MMM d"),
                 completed: dayTasks.filter((t) => t.completed || t.status === "DONE").length,
                 total: dayTasks.length,
+                hours: Math.round(dayTasks.reduce((acc, t) => acc + (t.actualMinutes || 0), 0) / 60 * 10) / 10,
             }
         })
     }
 
-    const completedTasks = individual?.tasks.filter((t) => t.completed || t.status === "DONE").length || 0
-    const totalTasks = individual?.tasks.length || 0
+    const filteredTasks = getFilteredTasks()
+    const completedTasks = filteredTasks.filter((t) => t.completed || t.status === "DONE").length
+    const totalTasks = filteredTasks.length
     const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+    const totalHoursSpent = Math.round(filteredTasks.reduce((acc, t) => acc + (t.actualMinutes || 0), 0) / 60 * 10) / 10
+    const totalEstimatedHours = Math.round(filteredTasks.reduce((acc, t) => acc + (t.estimatedMinutes || 0), 0) / 60 * 10) / 10
 
     const sidebarContent = (
         <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
@@ -305,36 +358,75 @@ export default function IndividualDetailPage() {
                                         {individual.email}
                                     </Typography>
                                 </Box>
-                                <Box sx={{ display: "flex", gap: 3 }}>
-                                    <Box sx={{ textAlign: "center" }}>
-                                        <Typography variant="h4" fontWeight={700} color="primary.main">
-                                            {totalTasks}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">Total Tasks</Typography>
-                                    </Box>
-                                    <Box sx={{ textAlign: "center" }}>
-                                        <Typography variant="h4" fontWeight={700} color="success.main">
-                                            {completedTasks}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">Completed</Typography>
-                                    </Box>
-                                    <Box sx={{ textAlign: "center" }}>
-                                        <Typography variant="h4" fontWeight={700} color="warning.main">
-                                            {completionRate}%
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">Rate</Typography>
-                                    </Box>
-                                </Box>
+                                <FormControl size="small" sx={{ minWidth: 140 }}>
+                                    <InputLabel>Time Range</InputLabel>
+                                    <Select
+                                        value={timeRange}
+                                        label="Time Range"
+                                        onChange={(e) => setTimeRange(e.target.value)}
+                                    >
+                                        <MenuItem value="week">Last 7 Days</MenuItem>
+                                        <MenuItem value="month">Last 30 Days</MenuItem>
+                                        <MenuItem value="2months">Last 2 Months</MenuItem>
+                                        <MenuItem value="3months">Last 3 Months</MenuItem>
+                                        <MenuItem value="6months">Last 6 Months</MenuItem>
+                                        <MenuItem value="year">Last 12 Months</MenuItem>
+                                    </Select>
+                                </FormControl>
                             </Box>
                         </CardContent>
                     </Card>
 
+                    {/* Stats Cards */}
+                    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", md: "repeat(5, 1fr)" }, gap: 2, mb: 3 }}>
+                        <Card>
+                            <CardContent sx={{ textAlign: "center" }}>
+                                <Typography variant="h4" fontWeight={700} color="primary.main">
+                                    {totalTasks}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">Total Tasks</Typography>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent sx={{ textAlign: "center" }}>
+                                <Typography variant="h4" fontWeight={700} color="success.main">
+                                    {completedTasks}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">Completed</Typography>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent sx={{ textAlign: "center" }}>
+                                <Typography variant="h4" fontWeight={700} color="warning.main">
+                                    {completionRate}%
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">Rate</Typography>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent sx={{ textAlign: "center" }}>
+                                <Typography variant="h4" fontWeight={700} color="info.main">
+                                    {totalHoursSpent}h
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">Hours Spent</Typography>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent sx={{ textAlign: "center" }}>
+                                <Typography variant="h4" fontWeight={700} color="secondary.main">
+                                    {totalEstimatedHours}h
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">Estimated</Typography>
+                            </CardContent>
+                        </Card>
+                    </Box>
+
                     <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3 }}>
-                        {/* Weekly Activity Chart */}
+                        {/* Activity Chart */}
                         <Card>
                             <CardContent>
                                 <Typography variant="h6" fontWeight={600} gutterBottom>
-                                    Weekly Activity
+                                    Activity Overview
                                 </Typography>
                                 <ResponsiveContainer width="100%" height={200}>
                                     <BarChart data={getWeeklyData()}>
