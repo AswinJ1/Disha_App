@@ -25,12 +25,11 @@ import {
     ListItemIcon,
     ListItemText,
     Divider,
-    Alert,
-    Snackbar,
     Badge,
     useMediaQuery,
     useTheme as useMuiTheme,
 } from "@mui/material"
+import toast from "react-hot-toast"
 import {
     Add,
     Delete,
@@ -53,9 +52,11 @@ import {
     Message,
     CheckCircle as CheckCircleIcon,
     Edit,
+    TableChart,
     Comment,
     SmartToy,
     Whatshot,
+    HandymanSharp,
 } from "@mui/icons-material"
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd"
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from "date-fns"
@@ -142,9 +143,9 @@ export default function IndividualDashboard() {
     const [notificationsOpen, setNotificationsOpen] = useState(false)
     const [notifications, setNotifications] = useState<Notification[]>([])
     const [unreadCount, setUnreadCount] = useState(0)
-    const [rewardSnackbar, setRewardSnackbar] = useState({ open: false, message: "" })
     const [activeTimer, setActiveTimer] = useState<string | null>(null)
-    const [timerSeconds, setTimerSeconds] = useState(0)
+    const [activeTimerStartedAt, setActiveTimerStartedAt] = useState<number | null>(null)
+    const [timerDisplay, setTimerDisplay] = useState(0)
     const [feedback, setFeedback] = useState<Feedback[]>([])
     const [motivationalQuote, setMotivationalQuote] = useState<MotivationalQuote | null>(null)
     const [editDialogOpen, setEditDialogOpen] = useState(false)
@@ -307,16 +308,43 @@ export default function IndividualDashboard() {
         setDrawerOpen(!isMobile)
     }, [isMobile])
 
-    // Timer effect
+    // Timer effect - calculates elapsed time from startedAt timestamp
     useEffect(() => {
         let interval: NodeJS.Timeout
-        if (activeTimer) {
+        if (activeTimer && activeTimerStartedAt) {
+            // Get the task to include previous accumulated time
+            const task = tasks.find(t => t.id === activeTimer)
+            const previousSeconds = (task?.actualMinutes || 0) * 60
+            
+            // Update display immediately
+            const elapsed = Math.floor((Date.now() - activeTimerStartedAt) / 1000) + previousSeconds
+            setTimerDisplay(elapsed)
+            
             interval = setInterval(() => {
-                setTimerSeconds((prev) => prev + 1)
+                const elapsed = Math.floor((Date.now() - activeTimerStartedAt) / 1000) + previousSeconds
+                setTimerDisplay(elapsed)
             }, 1000)
         }
         return () => clearInterval(interval)
-    }, [activeTimer])
+    }, [activeTimer, activeTimerStartedAt, tasks])
+
+    // Restore active timer from tasks on load
+    useEffect(() => {
+        // Find any task with startedAt that is IN_PROGRESS (timer was running)
+        const runningTask = tasks.find(t => t.startedAt && t.status === "IN_PROGRESS")
+        if (runningTask && runningTask.startedAt) {
+            setActiveTimer(runningTask.id)
+            setActiveTimerStartedAt(new Date(runningTask.startedAt).getTime())
+        } else if (activeTimer) {
+            // Check if the active timer task is still in progress
+            const currentTask = tasks.find(t => t.id === activeTimer)
+            if (!currentTask || currentTask.status === "DONE" || !currentTask.startedAt) {
+                setActiveTimer(null)
+                setActiveTimerStartedAt(null)
+                setTimerDisplay(0)
+            }
+        }
+    }, [tasks])
 
     const handleAddTask = async () => {
         if (!newTask.title.trim()) return
@@ -337,14 +365,14 @@ export default function IndividualDashboard() {
                 setNewTask({ title: "", description: "", estimatedMinutes: "" })
                 fetchTasks(selectedDate)
                 fetchAllTasks()
-                setRewardSnackbar({ open: true, message: "✅ Task created successfully!" })
+                toast.success("Task created successfully!")
             } else {
                 const error = await res.json()
-                setRewardSnackbar({ open: true, message: `❌ Error: ${error.error || "Failed to create task"}` })
+                toast.error(error.error || "Failed to create task")
             }
         } catch (error) {
             console.error("Failed to add task:", error)
-            setRewardSnackbar({ open: true, message: "❌ Network error. Please try again." })
+            toast.error("Network error. Please try again.")
         }
     }
 
@@ -399,7 +427,7 @@ export default function IndividualDashboard() {
                     return updated
                 })
                 if (updatedTask.status === "DONE" && updatedTask.aiReward) {
-                    setRewardSnackbar({ open: true, message: updatedTask.aiReward })
+                    toast.success(updatedTask.aiReward, { duration: 5000 })
                 }
             } else {
                 // Revert on error - refetch to restore correct state
@@ -456,38 +484,65 @@ export default function IndividualDashboard() {
                 setEditTask(null)
                 fetchTasks(selectedDate)
                 fetchAllTasks()
-                setRewardSnackbar({ open: true, message: "✅ Task updated successfully!" })
+                toast.success("Task updated successfully!")
             }
         } catch (error) {
             console.error("Failed to update task:", error)
-            setRewardSnackbar({ open: true, message: "❌ Failed to update task" })
+            toast.error("Failed to update task")
         }
     }
 
     const handleStartTimer = async (taskId: string) => {
         if (activeTimer === taskId) {
-            // Stop timer
-            const actualMinutes = Math.ceil(timerSeconds / 60)
+            // Stop timer - use activeTimerStartedAt (guaranteed to be set) for calculation
+            const task = tasks.find(t => t.id === taskId)
+            const previousMinutes = task?.actualMinutes || 0
+            
+            // Use activeTimerStartedAt which we stored when starting - more reliable than task.startedAt
+            let actualMinutes = previousMinutes
+            if (activeTimerStartedAt) {
+                const elapsedSeconds = Math.floor((Date.now() - activeTimerStartedAt) / 1000)
+                // Add elapsed minutes to existing actualMinutes (accumulate time)
+                const elapsedMinutes = Math.floor(elapsedSeconds / 60)
+                actualMinutes = previousMinutes + elapsedMinutes
+            }
+            
+            // Clear local state first
+            setActiveTimer(null)
+            setActiveTimerStartedAt(null)
+            setTimerDisplay(0)
+            
             try {
                 await fetch("/api/tasks", {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ id: taskId, actualMinutes }),
+                    body: JSON.stringify({ id: taskId, actualMinutes, startedAt: null }),
                 })
                 fetchTasks(selectedDate)
+                fetchAllTasks()
             } catch (error) {
                 console.error("Failed to save time:", error)
             }
-            setActiveTimer(null)
-            setTimerSeconds(0)
         } else {
-            // Start timer
+            // Start timer - store startedAt in database (don't reset actualMinutes)
+            const startTime = Date.now()
+            
+            // Set local state immediately for responsive UI
             setActiveTimer(taskId)
-            const task = tasks.find((t) => t.id === taskId)
-            if (task?.actualMinutes) {
-                setTimerSeconds(task.actualMinutes * 60)
-            } else {
-                setTimerSeconds(0)
+            setActiveTimerStartedAt(startTime)
+            
+            try {
+                await fetch("/api/tasks", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id: taskId, startedAt: new Date(startTime).toISOString(), status: "IN_PROGRESS" }),
+                })
+                fetchTasks(selectedDate)
+            } catch (error) {
+                console.error("Failed to start timer:", error)
+                // Revert local state on error
+                setActiveTimer(null)
+                setActiveTimerStartedAt(null)
             }
         }
     }
@@ -497,9 +552,12 @@ export default function IndividualDashboard() {
         const mins = Math.floor((seconds % 3600) / 60)
         const secs = seconds % 60
         if (hrs > 0) {
-            return `${hrs}h ${mins}m`
+            return `${hrs}h ${mins}m ${secs}s`
         }
-        return `${mins}m ${secs}s`
+        if (mins > 0) {
+            return `${mins}m ${secs}s`
+        }
+        return `${secs}s`
     }
 
     const handleOpenNotifications = () => {
@@ -548,6 +606,10 @@ export default function IndividualDashboard() {
                     <ListItemButton selected>
                         <ListItemIcon><Home sx={{ color: "primary.main" }} /></ListItemIcon>
                         <ListItemText primary="Kanban Board" />
+                    </ListItemButton>
+                    <ListItemButton component={Link} href="/individual/tasks">
+                        <ListItemIcon><TableChart /></ListItemIcon>
+                        <ListItemText primary="Tasks Table" />
                     </ListItemButton>
                     <ListItemButton component={Link} href="/individual/analytics">
                         <ListItemIcon><Analytics /></ListItemIcon>
@@ -806,10 +868,6 @@ export default function IndividualDashboard() {
                     <Card
                         sx={{
                             mb: 3,
-                            background: mode === "dark"
-                                ? "linear-gradient(135deg, #1a237e 0%, #311b92 100%)"
-                                : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                            color: "white",
                             position: "relative",
                             overflow: "hidden",
                             borderRadius: 0,
@@ -819,10 +877,13 @@ export default function IndividualDashboard() {
                             <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}>
                                 <EmojiEvents sx={{ fontSize: 40, opacity: 0.9 }} />
                                 <Box sx={{ flex: 1 }}>
+                                          <Typography variant="h6" color="text.secondary" gutterBottom>
+                            Hello, {session?.user?.name || "User"}! 👋
+                        </Typography>
                                     <Typography variant="h6" fontWeight={600} sx={{ mb: 1 }}>
-                                        💪 Daily Motivation
+                                        Daily Motivation
                                     </Typography>
-                                    {motivationalQuote.personalMessage && (
+                                    {/* {motivationalQuote.personalMessage && (
                                         <Chip
                                             label={motivationalQuote.personalMessage}
                                             sx={{
@@ -834,8 +895,8 @@ export default function IndividualDashboard() {
                                             }}
                                             size="small"
                                         />
-                                    )}
-                                    <Typography variant="body1" sx={{ fontStyle: "italic", mb: 1, opacity: 0.95 }}>
+                                    )} */}
+                                    <Typography variant="body1" sx={{ fontStyle: "bold", mb: 1, opacity: 0.95 }}>
                                         "{motivationalQuote.quote}"
                                     </Typography>
                                     <Typography variant="caption" sx={{ opacity: 0.8 }}>
@@ -853,7 +914,7 @@ export default function IndividualDashboard() {
                         <CardContent>
                             <Typography variant="h6" fontWeight={600} sx={{ mb: 2, display: "flex", alignItems: "center", gap: 1 }}>
                                 <Message color="primary" />
-                                Messages from Your Counselor
+                                Messages from Your Mentor
                                 <Typography variant="caption" color="text.secondary" sx={{ ml: "auto" }}>
                                     {format(selectedDate, "MMM d, yyyy")}
                                 </Typography>
@@ -1008,7 +1069,7 @@ export default function IndividualDashboard() {
                                                                     {(task.actualMinutes || activeTimer === task.id) && (
                                                                         <Chip
                                                                             icon={<Timer sx={{ fontSize: "0.875rem" }} />}
-                                                                            label={activeTimer === task.id ? formatTime(timerSeconds) : `${task.actualMinutes}m`}
+                                                                            label={activeTimer === task.id ? formatTime(timerDisplay) : `${task.actualMinutes}m`}
                                                                             size="small"
                                                                             color={activeTimer === task.id ? "warning" : "success"}
                                                                             sx={{ height: 22, "& .MuiChip-label": { px: 0.75, fontSize: "0.7rem" } }}
@@ -1029,16 +1090,6 @@ export default function IndividualDashboard() {
                                                                             {activeTimer === task.id ? "Stop" : "Start"}
                                                                         </Button>
                                                                     </Box>
-                                                                )}
-
-                                                                {task.aiReward && task.status === "DONE" && (
-                                                                    <Chip
-                                                                        icon={<EmojiEvents sx={{ fontSize: "0.875rem" }} />}
-                                                                        label={task.aiReward.substring(0, 30) + "..."}
-                                                                        size="small"
-                                                                        color="success"
-                                                                        sx={{ mt: 1, height: 22, "& .MuiChip-label": { fontSize: "0.65rem" } }}
-                                                                    />
                                                                 )}
 
                                                                 {task.comments && task.comments.length > 0 && (
@@ -1183,18 +1234,6 @@ export default function IndividualDashboard() {
                     </Button>
                 </DialogActions>
             </Dialog>
-
-            {/* Reward Snackbar */}
-            <Snackbar
-                open={rewardSnackbar.open}
-                autoHideDuration={5000}
-                onClose={() => setRewardSnackbar({ open: false, message: "" })}
-                anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-            >
-                <Alert onClose={() => setRewardSnackbar({ open: false, message: "" })} severity="success">
-                    {rewardSnackbar.message}
-                </Alert>
-            </Snackbar>
         </Box>
     )
 }

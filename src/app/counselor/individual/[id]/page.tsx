@@ -32,6 +32,16 @@ import {
     InputLabel,
     Select,
     MenuItem,
+    Tabs,
+    Tab,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    TablePagination,
+    Skeleton,
 } from "@mui/material"
 import {
     ArrowBack,
@@ -47,6 +57,8 @@ import {
     DarkMode,
     LightMode,
     Message,
+    HourglassEmpty,
+    AccessTime,
 } from "@mui/icons-material"
 import {
     BarChart,
@@ -72,12 +84,15 @@ interface Individual {
 interface Task {
     id: string
     title: string
+    description?: string
     date: string
     status: string
     completed: boolean
     completedAt: string | null
     actualMinutes: number | null
     estimatedMinutes: number | null
+    updatedAt?: string
+    createdAt?: string
 }
 
 interface Feedback {
@@ -87,6 +102,36 @@ interface Feedback {
 }
 
 const drawerWidth = 260
+
+// Tab panel component
+interface TabPanelProps {
+    children?: React.ReactNode
+    index: number
+    value: number
+}
+
+function TabPanel(props: TabPanelProps) {
+    const { children, value, index, ...other } = props
+    return (
+        <div
+            role="tabpanel"
+            hidden={value !== index}
+            id={`task-tabpanel-${index}`}
+            aria-labelledby={`task-tab-${index}`}
+            {...other}
+        >
+            {value === index && <Box sx={{ pt: 2 }}>{children}</Box>}
+        </div>
+    )
+}
+
+function formatMinutes(minutes: number | null): string {
+    if (minutes === null || minutes === undefined) return "—"
+    if (minutes < 60) return `${minutes}m`
+    const hours = Math.floor(minutes / 60)
+    const mins = minutes % 60
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
+}
 
 export default function IndividualDetailPage() {
     const muiTheme = useMuiTheme()
@@ -101,6 +146,12 @@ export default function IndividualDetailPage() {
     const [sending, setSending] = useState(false)
     const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" as "success" | "error" })
     const [timeRange, setTimeRange] = useState("week")
+    
+    // Task table state
+    const [taskTabValue, setTaskTabValue] = useState(0)
+    const [inProgressPage, setInProgressPage] = useState(0)
+    const [completedPage, setCompletedPage] = useState(0)
+    const pageSize = 10
 
     const fetchIndividual = useCallback(async () => {
         try {
@@ -241,15 +292,15 @@ export default function IndividualDetailPage() {
 
             <Box sx={{ flex: 1, overflow: "auto", p: 1 }}>
                 <List>
-                    <ListItemButton component={Link} href="/counselor" sx={{ borderRadius: 2 }}>
+                    <ListItemButton component={Link} href="/counselor" sx={{ borderRadius: 0 }}>
                         <ListItemIcon><Home /></ListItemIcon>
                         <ListItemText primary="Dashboard" />
                     </ListItemButton>
-                    <ListItemButton selected sx={{ borderRadius: 2 }}>
+                    <ListItemButton selected sx={{ borderRadius: 0 }}>
                         <ListItemIcon><People sx={{ color: "primary.main" }} /></ListItemIcon>
                         <ListItemText primary="Individual Details" />
                     </ListItemButton>
-                    <ListItemButton sx={{ borderRadius: 2 }}>
+                    <ListItemButton sx={{ borderRadius: 0 }}>
                         <ListItemIcon><Analytics /></ListItemIcon>
                         <ListItemText primary="Reports" />
                     </ListItemButton>
@@ -344,7 +395,7 @@ export default function IndividualDetailPage() {
                 <Toolbar />
                 <Container maxWidth="xl" disableGutters>
                     {/* Profile Header */}
-                    <Card sx={{ mb: 3 }}>
+                    <Card sx={{ mb: 3, borderRadius: 0 }}>
                         <CardContent>
                             <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 2 }}>
                                 <Avatar sx={{ bgcolor: "primary.main", width: 64, height: 64, fontSize: "1.5rem" }}>
@@ -379,7 +430,7 @@ export default function IndividualDetailPage() {
 
                     {/* Stats Cards */}
                     <Box sx={{ display: "grid", gridTemplateColumns: { xs: "repeat(2, 1fr)", md: "repeat(5, 1fr)" }, gap: 2, mb: 3 }}>
-                        <Card>
+                        <Card sx={{ borderRadius: 0 }}>
                             <CardContent sx={{ textAlign: "center" }}>
                                 <Typography variant="h4" fontWeight={700} color="primary.main">
                                     {totalTasks}
@@ -387,7 +438,7 @@ export default function IndividualDetailPage() {
                                 <Typography variant="caption" color="text.secondary">Total Tasks</Typography>
                             </CardContent>
                         </Card>
-                        <Card>
+                        <Card sx={{ borderRadius: 0 }}>
                             <CardContent sx={{ textAlign: "center" }}>
                                 <Typography variant="h4" fontWeight={700} color="success.main">
                                     {completedTasks}
@@ -395,7 +446,7 @@ export default function IndividualDetailPage() {
                                 <Typography variant="caption" color="text.secondary">Completed</Typography>
                             </CardContent>
                         </Card>
-                        <Card>
+                        <Card sx={{ borderRadius: 0 }}>
                             <CardContent sx={{ textAlign: "center" }}>
                                 <Typography variant="h4" fontWeight={700} color="warning.main">
                                     {completionRate}%
@@ -403,7 +454,7 @@ export default function IndividualDetailPage() {
                                 <Typography variant="caption" color="text.secondary">Rate</Typography>
                             </CardContent>
                         </Card>
-                        <Card>
+                        <Card sx={{ borderRadius: 0 }}>
                             <CardContent sx={{ textAlign: "center" }}>
                                 <Typography variant="h4" fontWeight={700} color="info.main">
                                     {totalHoursSpent}h
@@ -411,7 +462,7 @@ export default function IndividualDetailPage() {
                                 <Typography variant="caption" color="text.secondary">Hours Spent</Typography>
                             </CardContent>
                         </Card>
-                        <Card>
+                        <Card sx={{ borderRadius: 0 }}>
                             <CardContent sx={{ textAlign: "center" }}>
                                 <Typography variant="h4" fontWeight={700} color="secondary.main">
                                     {totalEstimatedHours}h
@@ -421,9 +472,9 @@ export default function IndividualDetailPage() {
                         </Card>
                     </Box>
 
-                    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3 }}>
+                    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3, mb: 3 }}>
                         {/* Activity Chart */}
-                        <Card>
+                        <Card sx={{ borderRadius: 0 }}>
                             <CardContent>
                                 <Typography variant="h6" fontWeight={600} gutterBottom>
                                     Activity Overview
@@ -434,15 +485,15 @@ export default function IndividualDetailPage() {
                                         <XAxis dataKey="day" stroke={muiTheme.palette.text.secondary} />
                                         <YAxis stroke={muiTheme.palette.text.secondary} />
                                         <Tooltip contentStyle={{ background: muiTheme.palette.background.paper, border: `1px solid ${muiTheme.palette.divider}` }} />
-                                        <Bar dataKey="completed" name="Completed" fill={muiTheme.palette.success.main} radius={[4, 4, 0, 0]} />
-                                        <Bar dataKey="total" name="Total" fill={muiTheme.palette.primary.light} radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="completed" name="Completed" fill={muiTheme.palette.success.main} radius={[0, 0, 0, 0]} />
+                                        <Bar dataKey="total" name="Total" fill={muiTheme.palette.primary.light} radius={[0, 0, 0, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </CardContent>
                         </Card>
 
                         {/* Send Feedback */}
-                        <Card>
+                        <Card sx={{ borderRadius: 0 }}>
                             <CardContent>
                                 <Typography variant="h6" fontWeight={600} gutterBottom>
                                     <Message sx={{ mr: 1, verticalAlign: "middle" }} />
@@ -467,50 +518,211 @@ export default function IndividualDetailPage() {
                                 </Button>
                             </CardContent>
                         </Card>
+                    </Box>
 
-                        {/* Recent Tasks */}
-                        <Card>
-                            <CardContent>
-                                <Typography variant="h6" fontWeight={600} gutterBottom>
-                                    Recent Tasks
-                                </Typography>
-                                {individual.tasks.slice(0, 5).map((task) => (
-                                    <Box
-                                        key={task.id}
-                                        sx={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "space-between",
-                                            py: 1,
-                                            borderBottom: "1px solid",
-                                            borderColor: "divider",
-                                        }}
-                                    >
-                                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                                            {task.completed || task.status === "DONE" ? (
-                                                <CheckCircle color="success" fontSize="small" />
-                                            ) : (
-                                                <Schedule color="warning" fontSize="small" />
+                    {/* Tasks Table with Tabs */}
+                    <Card sx={{ mb: 3, borderRadius: 0 }}>
+                        <CardContent>
+                            <Typography variant="h6" fontWeight={600} gutterBottom>
+                                Tasks Overview
+                            </Typography>
+                            <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+                                <Tabs
+                                    value={taskTabValue}
+                                    onChange={(_, newValue) => {
+                                        setTaskTabValue(newValue)
+                                        if (newValue === 0) setInProgressPage(0)
+                                        else setCompletedPage(0)
+                                    }}
+                                    sx={{
+                                        "& .MuiTab-root": {
+                                            textTransform: "none",
+                                            fontWeight: 600,
+                                        },
+                                    }}
+                                >
+                                    <Tab
+                                        icon={<HourglassEmpty sx={{ color: "#1976d2" }} />}
+                                        iconPosition="start"
+                                        label={`In Progress (${individual.tasks.filter(t => t.status === "IN_PROGRESS" || t.status === "TODO").length})`}
+                                    />
+                                    <Tab
+                                        icon={<CheckCircle sx={{ color: "#2e7d32" }} />}
+                                        iconPosition="start"
+                                        label={`Completed (${individual.tasks.filter(t => t.status === "DONE").length})`}
+                                    />
+                                </Tabs>
+                            </Box>
+
+                            {/* In Progress Tab */}
+                            <TabPanel value={taskTabValue} index={0}>
+                                {(() => {
+                                    const inProgressTasks = individual.tasks.filter(t => t.status === "IN_PROGRESS" || t.status === "TODO")
+                                    const paginatedTasks = inProgressTasks.slice(inProgressPage * pageSize, (inProgressPage + 1) * pageSize)
+                                    
+                                    return (
+                                        <>
+                                            <TableContainer>
+                                                <Table size="small">
+                                                    <TableHead>
+                                                        <TableRow>
+                                                            <TableCell sx={{ fontWeight: 600 }}>Task</TableCell>
+                                                            <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                                                            <TableCell sx={{ fontWeight: 600 }}>Estimated</TableCell>
+                                                            <TableCell sx={{ fontWeight: 600 }}>Actual</TableCell>
+                                                            <TableCell sx={{ fontWeight: 600 }}>Updated</TableCell>
+                                                        </TableRow>
+                                                    </TableHead>
+                                                    <TableBody>
+                                                        {paginatedTasks.length === 0 ? (
+                                                            <TableRow>
+                                                                <TableCell colSpan={5} sx={{ textAlign: "center", py: 4 }}>
+                                                                    <Typography color="text.secondary">No in-progress tasks</Typography>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ) : (
+                                                            paginatedTasks.map((task) => (
+                                                                <TableRow key={task.id} hover>
+                                                                    <TableCell>
+                                                                        <Box>
+                                                                            <Typography variant="body2" fontWeight={500}>{task.title}</Typography>
+                                                                            {task.description && (
+                                                                                <Typography variant="caption" color="text.secondary" sx={{ display: "block", maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                                                    {task.description}
+                                                                                </Typography>
+                                                                            )}
+                                                                        </Box>
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <Chip
+                                                                            label={task.status === "IN_PROGRESS" ? "In Progress" : "To Do"}
+                                                                            size="small"
+                                                                            color={task.status === "IN_PROGRESS" ? "warning" : "default"}
+                                                                        />
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                                                            <HourglassEmpty sx={{ fontSize: 16, color: "#1976d2" }} />
+                                                                            <Typography variant="body2">{formatMinutes(task.estimatedMinutes || 0)}</Typography>
+                                                                        </Box>
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                                                            <AccessTime sx={{ fontSize: 16, color: "#1976d2" }} />
+                                                                            <Typography variant="body2">{formatMinutes(task.actualMinutes || 0)}</Typography>
+                                                                        </Box>
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <Typography variant="body2" color="text.secondary">
+                                                                            {task.updatedAt ? format(new Date(task.updatedAt), "MMM d, yyyy") : "-"}
+                                                                        </Typography>
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            ))
+                                                        )}
+                                                    </TableBody>
+                                                </Table>
+                                            </TableContainer>
+                                            {inProgressTasks.length > pageSize && (
+                                                <TablePagination
+                                                    component="div"
+                                                    count={inProgressTasks.length}
+                                                    page={inProgressPage}
+                                                    onPageChange={(_, page) => setInProgressPage(page)}
+                                                    rowsPerPage={pageSize}
+                                                    rowsPerPageOptions={[pageSize]}
+                                                />
                                             )}
-                                            <Typography variant="body2">{task.title}</Typography>
-                                        </Box>
-                                        <Chip
-                                            label={task.status}
-                                            size="small"
-                                            color={task.status === "DONE" ? "success" : task.status === "IN_PROGRESS" ? "warning" : "default"}
-                                        />
-                                    </Box>
-                                ))}
-                                {individual.tasks.length === 0 && (
-                                    <Typography color="text.secondary" sx={{ py: 2, textAlign: "center" }}>
-                                        No tasks yet
-                                    </Typography>
-                                )}
-                            </CardContent>
-                        </Card>
+                                        </>
+                                    )
+                                })()}
+                            </TabPanel>
 
+                            {/* Completed Tab */}
+                            <TabPanel value={taskTabValue} index={1}>
+                                {(() => {
+                                    const completedTasksList = individual.tasks.filter(t => t.status === "DONE")
+                                    const paginatedTasks = completedTasksList.slice(completedPage * pageSize, (completedPage + 1) * pageSize)
+                                    
+                                    return (
+                                        <>
+                                            <TableContainer>
+                                                <Table size="small">
+                                                    <TableHead>
+                                                        <TableRow>
+                                                            <TableCell sx={{ fontWeight: 600 }}>Task</TableCell>
+                                                            <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                                                            <TableCell sx={{ fontWeight: 600 }}>Estimated</TableCell>
+                                                            <TableCell sx={{ fontWeight: 600 }}>Actual</TableCell>
+                                                            <TableCell sx={{ fontWeight: 600 }}>Completed</TableCell>
+                                                        </TableRow>
+                                                    </TableHead>
+                                                    <TableBody>
+                                                        {paginatedTasks.length === 0 ? (
+                                                            <TableRow>
+                                                                <TableCell colSpan={5} sx={{ textAlign: "center", py: 4 }}>
+                                                                    <Typography color="text.secondary">No completed tasks</Typography>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        ) : (
+                                                            paginatedTasks.map((task) => (
+                                                                <TableRow key={task.id} hover>
+                                                                    <TableCell>
+                                                                        <Box>
+                                                                            <Typography variant="body2" fontWeight={500}>{task.title}</Typography>
+                                                                            {task.description && (
+                                                                                <Typography variant="caption" color="text.secondary" sx={{ display: "block", maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                                                    {task.description}
+                                                                                </Typography>
+                                                                            )}
+                                                                        </Box>
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <Chip label="Completed" size="small" color="success" />
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                                                            <HourglassEmpty sx={{ fontSize: 16, color: "#1976d2" }} />
+                                                                            <Typography variant="body2">{formatMinutes(task.estimatedMinutes || 0)}</Typography>
+                                                                        </Box>
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                                                                            <AccessTime sx={{ fontSize: 16, color: "#1976d2" }} />
+                                                                            <Typography variant="body2">{formatMinutes(task.actualMinutes || 0)}</Typography>
+                                                                        </Box>
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <Typography variant="body2" color="text.secondary">
+                                                                            {task.completedAt ? format(new Date(task.completedAt), "MMM d, yyyy") : "-"}
+                                                                        </Typography>
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            ))
+                                                        )}
+                                                    </TableBody>
+                                                </Table>
+                                            </TableContainer>
+                                            {completedTasksList.length > pageSize && (
+                                                <TablePagination
+                                                    component="div"
+                                                    count={completedTasksList.length}
+                                                    page={completedPage}
+                                                    onPageChange={(_, page) => setCompletedPage(page)}
+                                                    rowsPerPage={pageSize}
+                                                    rowsPerPageOptions={[pageSize]}
+                                                />
+                                            )}
+                                        </>
+                                    )
+                                })()}
+                            </TabPanel>
+                        </CardContent>
+                    </Card>
+
+                    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" }, gap: 3 }}>
                         {/* Feedback History */}
-                        <Card>
+                        <Card sx={{ borderRadius: 0 }}>
                             <CardContent>
                                 <Typography variant="h6" fontWeight={600} gutterBottom>
                                     Feedback History
@@ -522,7 +734,7 @@ export default function IndividualDetailPage() {
                                             p: 1.5,
                                             mb: 1,
                                             bgcolor: "action.hover",
-                                            borderRadius: 1,
+                                            borderRadius: 0,
                                         }}
                                     >
                                         <Typography variant="body2">{feedback.message}</Typography>

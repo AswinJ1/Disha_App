@@ -38,6 +38,7 @@ import {
     DarkMode,
     LightMode,
     SmartToy,
+    TableChart,
 } from "@mui/icons-material"
 import {
     BarChart,
@@ -254,6 +255,10 @@ export default function IndividualAnalytics() {
                     <ListItemButton component={Link} href="/individual" sx={{ borderRadius: 2 }}>
                         <ListItemIcon><Home /></ListItemIcon>
                         <ListItemText primary="Kanban Board" />
+                    </ListItemButton>
+                    <ListItemButton component={Link} href="/individual/tasks" sx={{ borderRadius: 2 }}>
+                        <ListItemIcon><TableChart /></ListItemIcon>
+                        <ListItemText primary="Tasks Table" />
                     </ListItemButton>
                     <ListItemButton selected sx={{ borderRadius: 2 }}>
                         <ListItemIcon><AnalyticsIcon sx={{ color: "primary.main" }} /></ListItemIcon>
