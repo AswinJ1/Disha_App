@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server"
+import { NextRequest } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
     try {
         const session = await auth()
         if (!session?.user?.id) {
@@ -13,37 +14,64 @@ export async function GET() {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 })
         }
 
+        // Get scope from query params (default to "group" for learning group)
+        const { searchParams } = new URL(request.url)
+        const scope = searchParams.get("scope") || "group"
+
         // Get the current user to find their counselor
         const currentUser = await prisma.user.findUnique({
             where: { id: session.user.id },
             select: { counselorId: true },
         })
 
-        if (!currentUser?.counselorId) {
-            return NextResponse.json({ 
-                leaderboard: [],
-                currentUserId: session.user.id,
-                message: "No counselor assigned" 
-            })
-        }
+        let individuals
 
-        // Fetch all individuals under the same counselor
-        const individuals = await prisma.user.findMany({
-            where: { counselorId: currentUser.counselorId },
-            select: {
-                id: true,
-                name: true,
-                tasks: {
-                    select: {
-                        id: true,
-                        status: true,
-                        completed: true,
-                        actualMinutes: true,
-                        estimatedMinutes: true,
+        if (scope === "global") {
+            // Fetch all individuals on the platform
+            individuals = await prisma.user.findMany({
+                where: { role: "INDIVIDUAL" },
+                select: {
+                    id: true,
+                    name: true,
+                    tasks: {
+                        select: {
+                            id: true,
+                            status: true,
+                            completed: true,
+                            actualMinutes: true,
+                            estimatedMinutes: true,
+                        },
                     },
                 },
-            },
-        })
+            })
+        } else {
+            // Learning Group: Fetch individuals under the same counselor
+            if (!currentUser?.counselorId) {
+                return NextResponse.json({ 
+                    leaderboard: [],
+                    currentUserId: session.user.id,
+                    scope,
+                    message: "No counselor assigned" 
+                })
+            }
+
+            individuals = await prisma.user.findMany({
+                where: { counselorId: currentUser.counselorId },
+                select: {
+                    id: true,
+                    name: true,
+                    tasks: {
+                        select: {
+                            id: true,
+                            status: true,
+                            completed: true,
+                            actualMinutes: true,
+                            estimatedMinutes: true,
+                        },
+                    },
+                },
+            })
+        }
 
         // Calculate metrics for each individual
         const leaderboardData = individuals.map((ind) => {
@@ -98,6 +126,7 @@ export async function GET() {
         return NextResponse.json({
             leaderboard: sortedLeaderboard,
             currentUserId: session.user.id,
+            scope,
             lastUpdated: new Date().toISOString(),
         })
     } catch (error) {

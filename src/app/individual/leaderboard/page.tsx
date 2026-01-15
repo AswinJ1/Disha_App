@@ -29,6 +29,8 @@ import {
     TableHead,
     TableRow,
     Chip,
+    Tabs,
+    Tab,
 } from "@mui/material"
 import {
     EmojiEvents,
@@ -49,6 +51,8 @@ import {
     Analytics,
     ViewKanban,
     TableChart,
+    Public,
+    Groups,
 } from "@mui/icons-material"
 import Link from "next/link"
 import { useThemeMode } from "@/theme/ThemeContext"
@@ -100,10 +104,12 @@ export default function IndividualLeaderboardPage() {
     const [drawerOpen, setDrawerOpen] = useState(!isMobile)
     const [lastUpdated, setLastUpdated] = useState<string | null>(null)
     const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+    const [tabValue, setTabValue] = useState(0) // 0 = Learning Group (default), 1 = Global
 
-    const fetchLeaderboard = useCallback(async () => {
+    const fetchLeaderboard = useCallback(async (scope: "group" | "global" = "group") => {
         try {
-            const res = await fetch("/api/individual/leaderboard")
+            setLoading(true)
+            const res = await fetch(`/api/individual/leaderboard?scope=${scope}`)
             if (res.ok) {
                 const data = await res.json()
                 setLeaderboard(data.leaderboard)
@@ -118,11 +124,12 @@ export default function IndividualLeaderboardPage() {
     }, [])
 
     useEffect(() => {
-        fetchLeaderboard()
+        const scope = tabValue === 0 ? "group" : "global"
+        fetchLeaderboard(scope)
         // Auto-refresh every 30 seconds
-        const interval = setInterval(fetchLeaderboard, 30000)
+        const interval = setInterval(() => fetchLeaderboard(scope), 30000)
         return () => clearInterval(interval)
-    }, [fetchLeaderboard])
+    }, [fetchLeaderboard, tabValue])
 
     useEffect(() => {
         setDrawerOpen(!isMobile)
@@ -276,7 +283,7 @@ export default function IndividualLeaderboardPage() {
                     <Box sx={{ mb: 3 }}>
                         <Typography variant="h5" fontWeight={700} gutterBottom>
                             <EmojiEvents sx={{ mr: 1, verticalAlign: "middle", color: "#FFD700" }} />
-                            Peer Rankings
+                            {tabValue === 0 ? "Learning Group Rankings" : "Global Rankings"}
                         </Typography>
                         {lastUpdated && (
                             <Typography variant="caption" color="text.secondary">
@@ -284,6 +291,32 @@ export default function IndividualLeaderboardPage() {
                             </Typography>
                         )}
                     </Box>
+
+                    {/* Tabs for Global / Learning Group */}
+                    <Card sx={{ mb: 3, borderRadius: 0 }}>
+                        <Tabs
+                            value={tabValue}
+                            onChange={(_, newValue) => setTabValue(newValue)}
+                            sx={{
+                                "& .MuiTab-root": {
+                                    textTransform: "none",
+                                    fontWeight: 600,
+                                    minHeight: 56,
+                                },
+                            }}
+                        >
+                            <Tab
+                                icon={<Groups sx={{ color: tabValue === 0 ? "#1976d2" : undefined }} />}
+                                iconPosition="start"
+                                label="Learning Group"
+                            />
+                            <Tab
+                                icon={<Public sx={{ color: tabValue === 1 ? "#1976d2" : undefined }} />}
+                                iconPosition="start"
+                                label="Global"
+                            />
+                        </Tabs>
+                    </Card>
 
                     {/* Current User Highlight */}
                     {currentUserEntry && (
@@ -298,7 +331,7 @@ export default function IndividualLeaderboardPage() {
                                     </Box>
                                     <Box sx={{ flex: 1 }}>
                                         <Typography variant="h6" fontWeight={600}>
-                                            Your Current Standing
+                                            Your Current Standing {tabValue === 1 && "(Global)"}
                                         </Typography>
                                         <Typography variant="body2" color="text.secondary">
                                             {currentUserEntry.completedTasks} tasks completed • {currentUserEntry.pendingTasks} pending • Score: {currentUserEntry.compositeScore}
@@ -312,96 +345,6 @@ export default function IndividualLeaderboardPage() {
                                 </Box>
                             </CardContent>
                         </Card>
-                    )}
-
-                    {/* Top 3 Podium */}
-                    {leaderboard.length >= 3 && (
-                        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" }, gap: 2, mb: 3 }}>
-                            {/* Second Place */}
-                            <Card sx={{ 
-                                borderRadius: 0, 
-                                order: { xs: 2, md: 1 },
-                                bgcolor: leaderboard[1]?.id === currentUserId ? "action.selected" : undefined,
-                            }}>
-                                <CardContent sx={{ textAlign: "center", py: 3 }}>
-                                    <WorkspacePremium sx={{ color: "#C0C0C0", fontSize: 48, mb: 1 }} />
-                                    <Typography variant="h6" fontWeight={700}>
-                                        2nd Place
-                                    </Typography>
-                                    <Avatar sx={{ bgcolor: "primary.main", width: 56, height: 56, mx: "auto", my: 1.5 }}>
-                                        {leaderboard[1]?.name[0]?.toUpperCase()}
-                                    </Avatar>
-                                    <Typography variant="h6" fontWeight={600}>
-                                        {leaderboard[1]?.name} {leaderboard[1]?.id === currentUserId && "(You)"}
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                                        {leaderboard[1]?.completedTasks} tasks completed
-                                    </Typography>
-                                    <Chip 
-                                        label={`Score: ${leaderboard[1]?.compositeScore}`} 
-                                        size="small" 
-                                        sx={{ bgcolor: "#C0C0C0", color: "#000" }} 
-                                    />
-                                </CardContent>
-                            </Card>
-
-                            {/* First Place */}
-                            <Card sx={{ 
-                                borderRadius: 0, 
-                                order: { xs: 1, md: 2 }, 
-                                border: "2px solid #FFD700",
-                                bgcolor: leaderboard[0]?.id === currentUserId ? "action.selected" : undefined,
-                            }}>
-                                <CardContent sx={{ textAlign: "center", py: 4 }}>
-                                    <WorkspacePremium sx={{ color: "#FFD700", fontSize: 64, mb: 1 }} />
-                                    <Typography variant="h5" fontWeight={700} color="#FFD700">
-                                        1st Place
-                                    </Typography>
-                                    <Avatar sx={{ bgcolor: "#FFD700", color: "#000", width: 72, height: 72, mx: "auto", my: 2 }}>
-                                        {leaderboard[0]?.name[0]?.toUpperCase()}
-                                    </Avatar>
-                                    <Typography variant="h5" fontWeight={700}>
-                                        {leaderboard[0]?.name} {leaderboard[0]?.id === currentUserId && "(You)"}
-                                    </Typography>
-                                    <Typography variant="body1" color="text.secondary" gutterBottom>
-                                        {leaderboard[0]?.completedTasks} tasks completed
-                                    </Typography>
-                                    <Chip 
-                                        label={`Score: ${leaderboard[0]?.compositeScore}`} 
-                                        size="small" 
-                                        sx={{ bgcolor: "#FFD700", color: "#000", fontWeight: 600 }} 
-                                    />
-                                </CardContent>
-                            </Card>
-
-                            {/* Third Place */}
-                            <Card sx={{ 
-                                borderRadius: 0, 
-                                order: { xs: 3, md: 3 },
-                                bgcolor: leaderboard[2]?.id === currentUserId ? "action.selected" : undefined,
-                            }}>
-                                <CardContent sx={{ textAlign: "center", py: 3 }}>
-                                    <WorkspacePremium sx={{ color: "#CD7F32", fontSize: 44, mb: 1 }} />
-                                    <Typography variant="h6" fontWeight={700}>
-                                        3rd Place
-                                    </Typography>
-                                    <Avatar sx={{ bgcolor: "primary.main", width: 52, height: 52, mx: "auto", my: 1.5 }}>
-                                        {leaderboard[2]?.name[0]?.toUpperCase()}
-                                    </Avatar>
-                                    <Typography variant="h6" fontWeight={600}>
-                                        {leaderboard[2]?.name} {leaderboard[2]?.id === currentUserId && "(You)"}
-                                    </Typography>
-                                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                                        {leaderboard[2]?.completedTasks} tasks completed
-                                    </Typography>
-                                    <Chip 
-                                        label={`Score: ${leaderboard[2]?.compositeScore}`} 
-                                        size="small" 
-                                        sx={{ bgcolor: "#CD7F32", color: "#fff" }} 
-                                    />
-                                </CardContent>
-                            </Card>
-                        </Box>
                     )}
 
                     {/* Full Leaderboard Table */}
@@ -441,7 +384,11 @@ export default function IndividualLeaderboardPage() {
                                         {leaderboard.length === 0 ? (
                                             <TableRow>
                                                 <TableCell colSpan={8} sx={{ textAlign: "center", py: 4 }}>
-                                                    <Typography color="text.secondary">No peers found under your counselor</Typography>
+                                                    <Typography color="text.secondary">
+                                                        {tabValue === 0 
+                                                            ? "You can see the rankings once mentor adds you to a learning group." 
+                                                            : "No individuals found on the platform"}
+                                                    </Typography>
                                                 </TableCell>
                                             </TableRow>
                                         ) : (
