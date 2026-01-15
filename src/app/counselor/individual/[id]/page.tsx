@@ -59,6 +59,7 @@ import {
     Message,
     HourglassEmpty,
     AccessTime,
+    Leaderboard,
 } from "@mui/icons-material"
 import {
     BarChart,
@@ -299,6 +300,10 @@ export default function IndividualDetailPage() {
                     <ListItemButton selected sx={{ borderRadius: 0 }}>
                         <ListItemIcon><People sx={{ color: "primary.main" }} /></ListItemIcon>
                         <ListItemText primary="Individual Details" />
+                    </ListItemButton>
+                    <ListItemButton component={Link} href="/counselor/leaderboard" sx={{ borderRadius: 0 }}>
+                        <ListItemIcon><Leaderboard /></ListItemIcon>
+                        <ListItemText primary="Leaderboard" />
                     </ListItemButton>
                     <ListItemButton sx={{ borderRadius: 0 }}>
                         <ListItemIcon><Analytics /></ListItemIcon>

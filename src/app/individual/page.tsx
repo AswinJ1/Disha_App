@@ -57,6 +57,7 @@ import {
     SmartToy,
     Whatshot,
     HandymanSharp,
+    Leaderboard,
 } from "@mui/icons-material"
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd"
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths } from "date-fns"
@@ -610,6 +611,10 @@ export default function IndividualDashboard() {
                     <ListItemButton component={Link} href="/individual/tasks">
                         <ListItemIcon><TableChart /></ListItemIcon>
                         <ListItemText primary="Tasks Table" />
+                    </ListItemButton>
+                    <ListItemButton component={Link} href="/individual/leaderboard">
+                        <ListItemIcon><Leaderboard /></ListItemIcon>
+                        <ListItemText primary="Leaderboard" />
                     </ListItemButton>
                     <ListItemButton component={Link} href="/individual/analytics">
                         <ListItemIcon><Analytics /></ListItemIcon>

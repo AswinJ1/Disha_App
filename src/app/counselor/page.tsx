@@ -50,6 +50,7 @@ import {
     Close,
     SmartToy,
     Message,
+    Leaderboard,
 } from "@mui/icons-material"
 import Link from "next/link"
 import { useThemeMode } from "@/theme/ThemeContext"
@@ -219,14 +220,18 @@ export default function CounselorDashboard() {
                         <ListItemIcon><Home sx={{ color: "primary.main" }} /></ListItemIcon>
                         <ListItemText primary="Dashboard" />
                     </ListItemButton>
-                    <ListItemButton>
+                    {/* <ListItemButton>
                         <ListItemIcon><People /></ListItemIcon>
                         <ListItemText primary="Individuals" />
+                    </ListItemButton> */}
+                    <ListItemButton component={Link} href="/counselor/leaderboard">
+                        <ListItemIcon><Leaderboard /></ListItemIcon>
+                        <ListItemText primary="Leaderboard" />
                     </ListItemButton>
-                    <ListItemButton>
+                    {/* <ListItemButton>
                         <ListItemIcon><Analytics /></ListItemIcon>
                         <ListItemText primary="Reports" />
-                    </ListItemButton>
+                    </ListItemButton> */}
                     <ListItemButton component={Link} href="/counselor/ai-assistant">
                         <ListItemIcon><SmartToy /></ListItemIcon>
                         <ListItemText primary="AI Assistant" />

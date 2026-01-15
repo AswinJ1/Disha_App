@@ -47,6 +47,7 @@ import {
     AccessTime,
     CheckCircle,
     HourglassEmpty,
+    Leaderboard,
 } from "@mui/icons-material"
 import { format } from "date-fns"
 import Link from "next/link"
@@ -239,6 +240,10 @@ export default function TasksTableView() {
                     <ListItemButton selected sx={{ borderRadius: 0 }}>
                         <ListItemIcon sx={{ minWidth: 40 }}><TableChart sx={{ color: "primary.main" }} /></ListItemIcon>
                         <ListItemText primary="Tasks Table" />
+                    </ListItemButton>
+                    <ListItemButton component={Link} href="/individual/leaderboard" sx={{ borderRadius: 0 }}>
+                        <ListItemIcon sx={{ minWidth: 40 }}><Leaderboard /></ListItemIcon>
+                        <ListItemText primary="Leaderboard" />
                     </ListItemButton>
                     <ListItemButton component={Link} href="/individual/analytics" sx={{ borderRadius: 0 }}>
                         <ListItemIcon sx={{ minWidth: 40 }}><AnalyticsIcon sx={{ color: "primary.main" }} /></ListItemIcon>

@@ -39,6 +39,7 @@ import {
     Add,
     Delete,
     History,
+    Leaderboard,
 } from "@mui/icons-material"
 import Link from "next/link"
 import { useThemeMode } from "@/theme/ThemeContext"
@@ -301,6 +302,14 @@ export default function CounselorAIAssistant() {
                     <ListItemButton component={Link} href="/counselor">
                         <ListItemIcon><Home /></ListItemIcon>
                         <ListItemText primary="Dashboard" />
+                    </ListItemButton>
+                    <ListItemButton component ={Link} href="/counselor/leaderboard" sx={{ borderRadius: 0 }}>
+                     <ListItemIcon><Leaderboard sx={{ color: "primary.main" }} /></ListItemIcon>
+                      <ListItemText primary="Leaderboard" />
+                    </ListItemButton>
+                     <ListItemButton component={Link} href="/counselor/ai-assistant" sx={{ borderRadius: 0 }}>
+                        <ListItemIcon><SmartToy /></ListItemIcon>
+                        <ListItemText primary="AI Assistant" />
                     </ListItemButton>
                 </List>
             </Box>

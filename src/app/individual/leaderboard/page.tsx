@@ -32,8 +32,6 @@ import {
 } from "@mui/material"
 import {
     EmojiEvents,
-    People,
-    Analytics,
     Notifications,
     Logout,
     Menu,
@@ -48,6 +46,9 @@ import {
     PendingActions,
     TrendingUp,
     WorkspacePremium,
+    Analytics,
+    ViewKanban,
+    TableChart,
 } from "@mui/icons-material"
 import Link from "next/link"
 import { useThemeMode } from "@/theme/ThemeContext"
@@ -55,7 +56,6 @@ import { useThemeMode } from "@/theme/ThemeContext"
 interface LeaderboardEntry {
     id: string
     name: string
-    email: string
     completedTasks: number
     pendingTasks: number
     totalTasks: number
@@ -90,7 +90,7 @@ function getRankColor(rank: number) {
     return "text.secondary"
 }
 
-export default function LeaderboardPage() {
+export default function IndividualLeaderboardPage() {
     const muiTheme = useMuiTheme()
     const { mode, toggleTheme } = useThemeMode()
     const isMobile = useMediaQuery(muiTheme.breakpoints.down("md"))
@@ -99,14 +99,16 @@ export default function LeaderboardPage() {
     const [loading, setLoading] = useState(true)
     const [drawerOpen, setDrawerOpen] = useState(!isMobile)
     const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
     const fetchLeaderboard = useCallback(async () => {
         try {
-            const res = await fetch("/api/counselor/leaderboard")
+            const res = await fetch("/api/individual/leaderboard")
             if (res.ok) {
                 const data = await res.json()
                 setLeaderboard(data.leaderboard)
                 setLastUpdated(data.lastUpdated)
+                setCurrentUserId(data.currentUserId)
             }
         } catch (error) {
             console.error("Failed to fetch leaderboard:", error)
@@ -126,19 +128,22 @@ export default function LeaderboardPage() {
         setDrawerOpen(!isMobile)
     }, [isMobile])
 
+    // Find current user's rank
+    const currentUserEntry = leaderboard.find(e => e.id === currentUserId)
+
     const sidebarContent = (
         <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
             <Box sx={{ p: 2, borderBottom: "1px solid", borderColor: "divider" }}>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <Avatar sx={{ bgcolor: "secondary.main", width: 32, height: 32, fontSize: "0.875rem" }}>
-                        {session?.user?.name?.[0]?.toUpperCase() || "C"}
+                    <Avatar sx={{ bgcolor: "primary.main", width: 32, height: 32, fontSize: "0.875rem" }}>
+                        {session?.user?.name?.[0]?.toUpperCase() || "U"}
                     </Avatar>
                     <Box sx={{ flex: 1 }}>
                         <Typography variant="subtitle2" fontWeight={600}>
-                            {session?.user?.name || "Counselor"}
+                            {session?.user?.name || "User"}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                            Counselor
+                            Individual
                         </Typography>
                     </Box>
                     <IconButton size="small" onClick={toggleTheme}>
@@ -149,23 +154,23 @@ export default function LeaderboardPage() {
 
             <Box sx={{ flex: 1, overflow: "auto", p: 1 }}>
                 <List>
-                    <ListItemButton component={Link} href="/counselor" sx={{ borderRadius: 0 }}>
-                        <ListItemIcon><Home /></ListItemIcon>
-                        <ListItemText primary="Dashboard" />
+                    <ListItemButton component={Link} href="/individual" sx={{ borderRadius: 0 }}>
+                        <ListItemIcon><ViewKanban /></ListItemIcon>
+                        <ListItemText primary="Task Board" />
                     </ListItemButton>
-                    {/* <ListItemButton sx={{ borderRadius: 0 }}>
-                        <ListItemIcon><People /></ListItemIcon>
-                        <ListItemText primary="Individuals" />
-                    </ListItemButton> */}
+                    <ListItemButton component={Link} href="/individual/tasks" sx={{ borderRadius: 0 }}>
+                        <ListItemIcon><TableChart /></ListItemIcon>
+                        <ListItemText primary="Tasks Table" />
+                    </ListItemButton>
                     <ListItemButton selected sx={{ borderRadius: 0 }}>
                         <ListItemIcon><LeaderboardIcon sx={{ color: "primary.main" }} /></ListItemIcon>
                         <ListItemText primary="Leaderboard" />
                     </ListItemButton>
-                    {/* <ListItemButton sx={{ borderRadius: 0 }}>
+                    <ListItemButton component={Link} href="/individual/analytics" sx={{ borderRadius: 0 }}>
                         <ListItemIcon><Analytics /></ListItemIcon>
-                        <ListItemText primary="Reports" />
-                    </ListItemButton> */}
-                    <ListItemButton component={Link} href="/counselor/ai-assistant" sx={{ borderRadius: 0 }}>
+                        <ListItemText primary="Analytics" />
+                    </ListItemButton>
+                    <ListItemButton component={Link} href="/individual/ai-assistant" sx={{ borderRadius: 0 }}>
                         <ListItemIcon><SmartToy /></ListItemIcon>
                         <ListItemText primary="AI Assistant" />
                     </ListItemButton>
@@ -173,17 +178,21 @@ export default function LeaderboardPage() {
 
                 <Divider sx={{ my: 2 }} />
 
-                <Typography variant="caption" color="text.secondary" sx={{ px: 2, fontWeight: 600, textTransform: "uppercase" }}>
-                    Quick Stats
-                </Typography>
-                <Box sx={{ px: 2, mt: 1 }}>
-                    <Typography variant="h4" fontWeight={700} color="primary.main">
-                        {leaderboard.length}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                        Total Individuals
-                    </Typography>
-                </Box>
+                {currentUserEntry && (
+                    <>
+                        <Typography variant="caption" color="text.secondary" sx={{ px: 2, fontWeight: 600, textTransform: "uppercase" }}>
+                            Your Rank
+                        </Typography>
+                        <Box sx={{ px: 2, mt: 1 }}>
+                            <Typography variant="h4" fontWeight={700} sx={{ color: getRankColor(currentUserEntry.rank) }}>
+                                #{currentUserEntry.rank}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                of {leaderboard.length} individuals
+                            </Typography>
+                        </Box>
+                    </>
+                )}
             </Box>
         </Box>
     )
@@ -267,7 +276,7 @@ export default function LeaderboardPage() {
                     <Box sx={{ mb: 3 }}>
                         <Typography variant="h5" fontWeight={700} gutterBottom>
                             <EmojiEvents sx={{ mr: 1, verticalAlign: "middle", color: "#FFD700" }} />
-                            Individual Rankings
+                            Peer Rankings
                         </Typography>
                         {lastUpdated && (
                             <Typography variant="caption" color="text.secondary">
@@ -276,11 +285,44 @@ export default function LeaderboardPage() {
                         )}
                     </Box>
 
+                    {/* Current User Highlight */}
+                    {currentUserEntry && (
+                        <Card sx={{ mb: 3, borderRadius: 0, border: currentUserEntry.rank <= 3 ? `2px solid ${getRankColor(currentUserEntry.rank)}` : undefined }}>
+                            <CardContent>
+                                <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                        {getRankIcon(currentUserEntry.rank)}
+                                        <Typography variant="h4" fontWeight={700} sx={{ color: getRankColor(currentUserEntry.rank) }}>
+                                            #{currentUserEntry.rank}
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ flex: 1 }}>
+                                        <Typography variant="h6" fontWeight={600}>
+                                            Your Current Standing
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {currentUserEntry.completedTasks} tasks completed • {currentUserEntry.pendingTasks} pending • Score: {currentUserEntry.compositeScore}
+                                        </Typography>
+                                    </Box>
+                                    <Chip 
+                                        label={`Efficiency: ${currentUserEntry.efficiency}%`}
+                                        variant="outlined"
+                                        color={currentUserEntry.efficiency >= 100 ? "success" : currentUserEntry.efficiency >= 75 ? "warning" : "error"}
+                                    />
+                                </Box>
+                            </CardContent>
+                        </Card>
+                    )}
+
                     {/* Top 3 Podium */}
                     {leaderboard.length >= 3 && (
                         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" }, gap: 2, mb: 3 }}>
                             {/* Second Place */}
-                            <Card sx={{ borderRadius: 0, order: { xs: 2, md: 1 } }}>
+                            <Card sx={{ 
+                                borderRadius: 0, 
+                                order: { xs: 2, md: 1 },
+                                bgcolor: leaderboard[1]?.id === currentUserId ? "action.selected" : undefined,
+                            }}>
                                 <CardContent sx={{ textAlign: "center", py: 3 }}>
                                     <WorkspacePremium sx={{ color: "#C0C0C0", fontSize: 48, mb: 1 }} />
                                     <Typography variant="h6" fontWeight={700}>
@@ -290,7 +332,7 @@ export default function LeaderboardPage() {
                                         {leaderboard[1]?.name[0]?.toUpperCase()}
                                     </Avatar>
                                     <Typography variant="h6" fontWeight={600}>
-                                        {leaderboard[1]?.name}
+                                        {leaderboard[1]?.name} {leaderboard[1]?.id === currentUserId && "(You)"}
                                     </Typography>
                                     <Typography variant="body2" color="text.secondary" gutterBottom>
                                         {leaderboard[1]?.completedTasks} tasks completed
@@ -304,7 +346,12 @@ export default function LeaderboardPage() {
                             </Card>
 
                             {/* First Place */}
-                            <Card sx={{ borderRadius: 0, order: { xs: 1, md: 2 }, border: "2px solid #FFD700" }}>
+                            <Card sx={{ 
+                                borderRadius: 0, 
+                                order: { xs: 1, md: 2 }, 
+                                border: "2px solid #FFD700",
+                                bgcolor: leaderboard[0]?.id === currentUserId ? "action.selected" : undefined,
+                            }}>
                                 <CardContent sx={{ textAlign: "center", py: 4 }}>
                                     <WorkspacePremium sx={{ color: "#FFD700", fontSize: 64, mb: 1 }} />
                                     <Typography variant="h5" fontWeight={700} color="#FFD700">
@@ -314,7 +361,7 @@ export default function LeaderboardPage() {
                                         {leaderboard[0]?.name[0]?.toUpperCase()}
                                     </Avatar>
                                     <Typography variant="h5" fontWeight={700}>
-                                        {leaderboard[0]?.name}
+                                        {leaderboard[0]?.name} {leaderboard[0]?.id === currentUserId && "(You)"}
                                     </Typography>
                                     <Typography variant="body1" color="text.secondary" gutterBottom>
                                         {leaderboard[0]?.completedTasks} tasks completed
@@ -328,7 +375,11 @@ export default function LeaderboardPage() {
                             </Card>
 
                             {/* Third Place */}
-                            <Card sx={{ borderRadius: 0, order: { xs: 3, md: 3 } }}>
+                            <Card sx={{ 
+                                borderRadius: 0, 
+                                order: { xs: 3, md: 3 },
+                                bgcolor: leaderboard[2]?.id === currentUserId ? "action.selected" : undefined,
+                            }}>
                                 <CardContent sx={{ textAlign: "center", py: 3 }}>
                                     <WorkspacePremium sx={{ color: "#CD7F32", fontSize: 44, mb: 1 }} />
                                     <Typography variant="h6" fontWeight={700}>
@@ -338,7 +389,7 @@ export default function LeaderboardPage() {
                                         {leaderboard[2]?.name[0]?.toUpperCase()}
                                     </Avatar>
                                     <Typography variant="h6" fontWeight={600}>
-                                        {leaderboard[2]?.name}
+                                        {leaderboard[2]?.name} {leaderboard[2]?.id === currentUserId && "(You)"}
                                     </Typography>
                                     <Typography variant="body2" color="text.secondary" gutterBottom>
                                         {leaderboard[2]?.completedTasks} tasks completed
@@ -367,19 +418,19 @@ export default function LeaderboardPage() {
                                             <TableCell sx={{ fontWeight: 600 }}>Rank</TableCell>
                                             <TableCell sx={{ fontWeight: 600 }}>Individual</TableCell>
                                             <TableCell sx={{ fontWeight: 600 }} align="center">
-                                                <CheckCircle sx={{ fontSize: 16, mr: 0.5, verticalAlign: "middle", color: "#2e7d32" }} />
+                                                {/* <CheckCircle sx={{ fontSize: 16, mr: 0.5, verticalAlign: "middle", color: "#1976d2" }} /> */}
                                                 Completed
                                             </TableCell>
                                             <TableCell sx={{ fontWeight: 600 }} align="center">
-                                                <PendingActions sx={{ fontSize: 16, mr: 0.5, verticalAlign: "middle", color: "#ed6c02" }} />
+                                                {/* <PendingActions sx={{ fontSize: 16, mr: 0.5, verticalAlign: "middle", color: "#1976d2" }} /> */}
                                                 Pending
                                             </TableCell>
                                             <TableCell sx={{ fontWeight: 600 }} align="center">
-                                                <HourglassEmpty sx={{ fontSize: 16, mr: 0.5, verticalAlign: "middle", color: "#1976d2" }} />
+                                                {/* <HourglassEmpty sx={{ fontSize: 16, mr: 0.5, verticalAlign: "middle", color: "#1976d2" }} /> */}
                                                 Estimated
                                             </TableCell>
                                             <TableCell sx={{ fontWeight: 600 }} align="center">
-                                                <AccessTime sx={{ fontSize: 16, mr: 0.5, verticalAlign: "middle", color: "#1976d2" }} />
+                                                {/* <AccessTime sx={{ fontSize: 16, mr: 0.5, verticalAlign: "middle", color: "#1976d2" }} /> */}
                                                 Actual
                                             </TableCell>
                                             <TableCell sx={{ fontWeight: 600 }} align="center">Efficiency</TableCell>
@@ -390,7 +441,7 @@ export default function LeaderboardPage() {
                                         {leaderboard.length === 0 ? (
                                             <TableRow>
                                                 <TableCell colSpan={8} sx={{ textAlign: "center", py: 4 }}>
-                                                    <Typography color="text.secondary">No individuals assigned yet</Typography>
+                                                    <Typography color="text.secondary">No peers found under your counselor</Typography>
                                                 </TableCell>
                                             </TableRow>
                                         ) : (
@@ -399,7 +450,11 @@ export default function LeaderboardPage() {
                                                     key={entry.id} 
                                                     hover
                                                     sx={{
-                                                        bgcolor: entry.rank <= 3 ? `${getRankColor(entry.rank)}10` : "transparent",
+                                                        bgcolor: entry.id === currentUserId 
+                                                            ? "action.selected" 
+                                                            : entry.rank <= 3 
+                                                                ? `${getRankColor(entry.rank)}10` 
+                                                                : "transparent",
                                                     }}
                                                 >
                                                     <TableCell>
@@ -407,7 +462,7 @@ export default function LeaderboardPage() {
                                                             {getRankIcon(entry.rank)}
                                                             <Typography 
                                                                 variant="body1" 
-                                                                fontWeight={entry.rank <= 3 ? 700 : 500}
+                                                                fontWeight={entry.rank <= 3 || entry.id === currentUserId ? 700 : 500}
                                                                 sx={{ color: getRankColor(entry.rank) }}
                                                             >
                                                                 #{entry.rank}
@@ -423,37 +478,19 @@ export default function LeaderboardPage() {
                                                                 <Typography 
                                                                     variant="body2" 
                                                                     fontWeight={600}
-                                                                    component={Link}
-                                                                    href={`/counselor/individual/${entry.id}`}
-                                                                    sx={{ 
-                                                                        textDecoration: "none", 
-                                                                        color: "inherit",
-                                                                        "&:hover": { color: "primary.main" }
-                                                                    }}
                                                                 >
-                                                                    {entry.name}
-                                                                </Typography>
-                                                                <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-                                                                    {entry.email}
+                                                                    {entry.name} {entry.id === currentUserId && <Chip label="You" size="small" color="primary" sx={{ ml: 1, height: 20 }} />}
                                                                 </Typography>
                                                             </Box>
                                                         </Box>
                                                     </TableCell>
                                                     <TableCell align="center">
-                                                        <Chip 
-                                                            label={entry.completedTasks} 
-                                                            size="small" 
-                                                            color="success" 
-                                                            variant="outlined"
-                                                        />
+                                                        {entry.completedTasks} 
+                                                         
                                                     </TableCell>
                                                     <TableCell align="center">
-                                                        <Chip 
-                                                            label={entry.pendingTasks} 
-                                                            size="small" 
-                                                            color={entry.pendingTasks === 0 ? "success" : "warning"}
-                                                            variant="outlined"
-                                                        />
+                                                       {entry.pendingTasks} 
+                                                         
                                                     </TableCell>
                                                     <TableCell align="center">
                                                         <Typography variant="body2">
@@ -466,11 +503,9 @@ export default function LeaderboardPage() {
                                                         </Typography>
                                                     </TableCell>
                                                     <TableCell align="center">
-                                                        <Chip 
-                                                            label={`${entry.efficiency}%`}
-                                                            size="small"
-                                                            color={entry.efficiency >= 100 ? "success" : entry.efficiency >= 75 ? "warning" : "error"}
-                                                        />
+                                                      
+                                                        {entry.efficiency}%
+                                                           
                                                     </TableCell>
                                                     <TableCell align="center">
                                                         <Typography 

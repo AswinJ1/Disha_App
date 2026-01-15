@@ -38,6 +38,7 @@ import {
     Delete,
     History,
     TableChart,
+    Leaderboard,
 } from "@mui/icons-material"
 import Link from "next/link"
 import { useThemeMode } from "@/theme/ThemeContext"
@@ -305,6 +306,10 @@ export default function IndividualAIAssistant() {
                     <ListItemButton component={Link} href="/individual/tasks">
                         <ListItemIcon><TableChart /></ListItemIcon>
                         <ListItemText primary="Tasks Table" />
+                    </ListItemButton>
+                    <ListItemButton component={Link} href="/individual/leaderboard">
+                        <ListItemIcon><Leaderboard /></ListItemIcon>
+                        <ListItemText primary="Leaderboard" />
                     </ListItemButton>
                     <ListItemButton component={Link} href="/individual/analytics">
                         <ListItemIcon><Analytics /></ListItemIcon>
